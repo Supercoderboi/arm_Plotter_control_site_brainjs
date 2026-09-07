@@ -89,7 +89,7 @@
                 </tbody>
             </table>
         </div>
-        <button onclick="Network()" class="btn-green" style="margin-top: 15px;"> Neural Net</button>
+        <button onclick="trainNetwork()" class="btn-green" style="margin-top: 15px;">Train Neural Net (Best of 5)</button>
     </div>
 
     <!-- Movement Target & Prediction Display -->
@@ -103,7 +103,7 @@
 
         <!-- Dynamic Output Readout -->
         <div id="predictionDisplay" class="prediction-box" style="display: none;">
-            <strong>Target Target Position:</strong> X: <span id="outX">0</span> mm, Y: <span id="outY">0</span> mm<br>
+            <strong>Target Position:</strong> X: <span id="outX">0</span> mm, Y: <span id="outY">0</span> mm<br>
             <strong>Calculated Angles:</strong> Base: <span id="outBase">0</span>°, Joint: <span id="outJoint">0</span>°
         </div>
     </div>
@@ -116,10 +116,10 @@ let rxCharacteristic = null;
 let bleDevice = null;
 let dataset = [];
 let net = null;
-let ised = false;
+let isTrained = false;
 let currentPenState = 0;
 
-// Load local dataset cache on boot
+// Load local dataset cache on launch
 window.onload = function() {
     const cached = localStorage.getItem("scara_local_dataset");
     if (cached) {
@@ -237,6 +237,7 @@ function readTableData() {
     saveLocalCache();
 }
 
+// Multi-Run Ensemble Training (Best-of-5)
 function trainNetwork() {
     readTableData();
     if (dataset.length < 3) {
@@ -251,7 +252,7 @@ function trainNetwork() {
 
     let bestNet = null;
     let lowestError = Infinity;
-    const runs = 5; // Train 5 separate times and pick the best one
+    const runs = 5;
 
     for (let i = 0; i < runs; i++) {
         let tempNet = new brain.NeuralNetwork({ 
@@ -265,7 +266,6 @@ function trainNetwork() {
             learningRate: 0.3
         });
 
-        // Track the run with the absolute lowest error
         if (stats.error < lowestError) {
             lowestError = stats.error;
             bestNet = tempNet;
@@ -274,7 +274,7 @@ function trainNetwork() {
 
     net = bestNet;
     isTrained = true;
-    alert(`Trained ${runs} models! Kept the best one with error: ${lowestError.toFixed(5)}`);
+    alert(`Trained ${runs} models successfully!\nKept best model with error: ${lowestError.toFixed(6)}`);
 }
 
 async function connectBLE() {
