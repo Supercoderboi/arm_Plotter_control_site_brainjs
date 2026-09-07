@@ -39,16 +39,15 @@
     <div class="card">
         <h3>Manual Servo Control</h3>
         <label>Base Angle (0-180): <span id="baseVal">90</span>°</label>
-        <input type="range" id="baseSlider" min="0" max="180" value="90" style="width: 100%;" oninput="updateSliders()">
+        <input type="range" id="baseSlider" min="0" max="180" value="90" style="width: 100%;" oninput="handleSliderInput()">
         
         <label>Joint Angle (20-180): <span id="jointVal">45</span>°</label>
-        <input type="range" id="jointSlider" min="20" max="180" value="45" style="width: 100%;" oninput="updateSliders()">
+        <input type="range" id="jointSlider" min="20" max="180" value="45" style="width: 100%;" oninput="handleSliderInput()">
 
         <div class="row">
             <button onclick="togglePen(1)">Pen DOWN</button>
             <button onclick="togglePen(0)">Pen UP</button>
         </div>
-        <button onclick="sendManualCommand()">Send Manual Angles</button>
     </div>
 
     <!-- Calibration Entry -->
@@ -89,7 +88,7 @@
                 </tbody>
             </table>
         </div>
-        <button onclick="trainNetwork()" class="btn-green" style="margin-top: 15px;">Train Neural Net (Best of 5)</button>
+        <button onclick="trainNetwork()" class="btn-green" style="margin-top: 15px;">Train Neural Net (Best of 20)</button>
     </div>
 
     <!-- Movement Target & Prediction Display -->
@@ -118,6 +117,7 @@ let dataset = [];
 let net = null;
 let isTrained = false;
 let currentPenState = 0;
+let isSending = false;
 
 // Load local dataset cache on launch
 window.onload = function() {
@@ -237,7 +237,7 @@ function readTableData() {
     saveLocalCache();
 }
 
-// Multi-Run Ensemble Training (Best-of-5)
+// Multi-Run Ensemble Training (Best-of-20)
 function trainNetwork() {
     readTableData();
     if (dataset.length < 3) {
@@ -252,7 +252,7 @@ function trainNetwork() {
 
     let bestNet = null;
     let lowestError = Infinity;
-    const runs = 5;
+    const runs = 20;
 
     for (let i = 0; i < runs; i++) {
         let tempNet = new brain.NeuralNetwork({ 
@@ -296,29 +296,34 @@ async function connectBLE() {
 }
 
 async function sendPacket(base, joint, pen) {
-    if (!rxCharacteristic) {
-        alert("Bluetooth not connected!");
-        return;
-    }
+    if (!rxCharacteristic) return;
     const encoder = new TextEncoder();
     const packet = `${base},${joint},${pen}\n`;
     await rxCharacteristic.writeValue(encoder.encode(packet));
 }
 
-function updateSliders() {
-    document.getElementById("baseVal").innerText = document.getElementById("baseSlider").value;
-    document.getElementById("jointVal").innerText = document.getElementById("jointSlider").value;
+// Live real-time slider handler
+async function handleSliderInput() {
+    const base = document.getElementById("baseSlider").value;
+    const joint = document.getElementById("jointSlider").value;
+    document.getElementById("baseVal").innerText = base;
+    document.getElementById("jointVal").innerText = joint;
+
+    if (isSending || !rxCharacteristic) return;
+
+    try {
+        isSending = true;
+        await sendPacket(base, joint, currentPenState);
+    } catch (err) {
+        console.error("BLE Send Error:", err);
+    } finally {
+        isSending = false;
+    }
 }
 
 function togglePen(state) {
     currentPenState = state;
-    sendManualCommand();
-}
-
-function sendManualCommand() {
-    const base = document.getElementById("baseSlider").value;
-    const joint = document.getElementById("jointSlider").value;
-    sendPacket(base, joint, currentPenState);
+    handleSliderInput();
 }
 
 function moveToTarget() {
