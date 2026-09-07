@@ -23,6 +23,10 @@
         th { background: #2a2a2a; }
         td input { width: 90%; padding: 4px; margin: 0; }
         .prediction-box { background: #2a2a2a; border-left: 4px solid #007aff; padding: 10px; margin-top: 10px; border-radius: 4px; }
+        canvas { background: #000; border-radius: 8px; width: 100%; height: auto; margin-top: 10px; border: 1px solid #333; }
+        .progress-bar { background: #333; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { background: #34c759; height: 100%; width: 0%; transition: width 0.1s; }
+        .setting-label { font-size: 13px; color: #aaa; margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -63,8 +67,6 @@
     <!-- File Management & Dataset Table -->
     <div class="card">
         <h3>Manage Calibration Dataset</h3>
-        
-        <!-- Local Import/Export Controls -->
         <div class="row">
             <button onclick="exportJSON()" class="btn-secondary">Export JSON File</button>
             <button onclick="document.getElementById('importFile').click()" class="btn-secondary">Import JSON File</button>
@@ -91,20 +93,42 @@
         <button onclick="trainNetwork()" class="btn-green" style="margin-top: 15px;">Train Neural Net (Best of 20)</button>
     </div>
 
-    <!-- Movement Target & Prediction Display -->
+    <!-- Single Movement Target -->
     <div class="card">
-        <h3>Move to Cartesian (X, Y)</h3>
+        <h3>Move to Target Cartesian (X, Y)</h3>
         <div class="row">
             <input type="number" id="targetX" placeholder="Target X (mm)">
             <input type="number" id="targetY" placeholder="Target Y (mm)">
         </div>
-        <button onclick="moveToTarget()">Move via NN Model</button>
+        <button onclick="moveToTarget()">Move via NN Model (Smooth)</button>
 
-        <!-- Dynamic Output Readout -->
         <div id="predictionDisplay" class="prediction-box" style="display: none;">
             <strong>Target Position:</strong> X: <span id="outX">0</span> mm, Y: <span id="outY">0</span> mm<br>
             <strong>Calculated Angles:</strong> Base: <span id="outBase">0</span>°, Joint: <span id="outJoint">0</span>°
         </div>
+    </div>
+
+    <!-- SVG Plotting Module -->
+    <div class="card">
+        <h3>SVG Plotter Engine</h3>
+        <button onclick="document.getElementById('svgFileInput').click()" class="btn-secondary">Load SVG File</button>
+        <input type="file" id="svgFileInput" accept=".svg" style="display:none;" onchange="handleSVGUpload(event)">
+        
+        <div class="setting-label">Interpolation Delay per Sub-Step (ms)</div>
+        <input type="number" id="lerpDelayInput" value="15" min="5" max="100">
+
+        <div class="row" style="margin-top: 10px;">
+            <button id="startPlotBtn" onclick="startPlotting()" class="btn-green" disabled>Start Smooth Plot</button>
+            <button id="stopPlotBtn" onclick="stopPlotting()" class="btn-red" disabled>Abort Plot</button>
+        </div>
+
+        <div class="progress-bar">
+            <div id="plotProgress" class="progress-fill"></div>
+        </div>
+        <div id="plotStatusText" style="margin-top: 5px; font-size: 14px;">No SVG Loaded</div>
+
+        <!-- Canvas Preview -->
+        <canvas id="previewCanvas" width="300" height="300"></canvas>
     </div>
 
 <script>
@@ -119,7 +143,11 @@ let isTrained = false;
 let currentPenState = 0;
 let isSending = false;
 
-// Global Min-Max Normalization Metadata
+// Hardware Position Tracking
+let currentBaseAngle = 90;
+let currentJointAngle = 45;
+
+// Global Normalization Bounds
 let normBounds = {
     minX: 0, maxX: 1,
     minY: 0, maxY: 1,
@@ -127,7 +155,11 @@ let normBounds = {
     minJoint: 0, maxJoint: 180
 };
 
-// Load local dataset cache on launch
+// SVG Execution State
+let parsedPaths = [];
+let isPlotting = false;
+let shouldAbort = false;
+
 window.onload = function() {
     const cached = localStorage.getItem("scara_local_dataset");
     if (cached) {
@@ -135,7 +167,7 @@ window.onload = function() {
             dataset = JSON.parse(cached);
             renderTable();
         } catch (e) {
-            console.error("Error loading cached local dataset:", e);
+            console.error("Error loading cached dataset:", e);
         }
     }
 };
@@ -174,7 +206,7 @@ function importJSON(event) {
                 renderTable();
                 alert("Calibration data imported successfully!");
             } else {
-                alert("Invalid JSON format. Expected an array of coordinate objects.");
+                alert("Invalid JSON format.");
             }
         } catch (err) {
             alert("Error parsing JSON file: " + err.message);
@@ -245,7 +277,6 @@ function readTableData() {
     saveLocalCache();
 }
 
-// Compute Dynamic Min-Max Normalization Limits
 function updateNormalizationBounds() {
     const xVals = dataset.map(p => p.x);
     const yVals = dataset.map(p => p.y);
@@ -262,14 +293,12 @@ function updateNormalizationBounds() {
     normBounds.minJoint = Math.min(...jointVals);
     normBounds.maxJoint = Math.max(...jointVals);
 
-    // Prevent divide-by-zero errors if min equals max
     if (normBounds.minX === normBounds.maxX) normBounds.maxX += 1;
     if (normBounds.minY === normBounds.maxY) normBounds.maxY += 1;
     if (normBounds.minBase === normBounds.maxBase) normBounds.maxBase += 1;
     if (normBounds.minJoint === normBounds.maxJoint) normBounds.maxJoint += 1;
 }
 
-// Multi-Run Ensemble Training (Best-of-20) with Dynamic Normalization
 function trainNetwork() {
     readTableData();
     if (dataset.length < 3) {
@@ -279,7 +308,6 @@ function trainNetwork() {
 
     updateNormalizationBounds();
 
-    // Map dataset dynamically onto [0, 1] range based on dataset limits
     const formattedData = dataset.map(p => ({
         input: { 
             x: (p.x - normBounds.minX) / (normBounds.maxX - normBounds.minX), 
@@ -315,7 +343,11 @@ function trainNetwork() {
 
     net = bestNet;
     isTrained = true;
-    alert(`Trained ${runs} models with Dynamic Min-Max scaling!\nBest model error: ${lowestError.toFixed(6)}`);
+    alert(`Trained ${runs} models successfully!\nBest model error: ${lowestError.toFixed(6)}`);
+    
+    if (parsedPaths.length > 0) {
+        document.getElementById("startPlotBtn").disabled = false;
+    }
 }
 
 async function connectBLE() {
@@ -339,14 +371,38 @@ async function connectBLE() {
 async function sendPacket(base, joint, pen) {
     if (!rxCharacteristic) return;
     const encoder = new TextEncoder();
-    const packet = `${base},${joint},${pen}\n`;
+    const packet = `${Math.round(base)},${Math.round(joint)},${pen}\n`;
     await rxCharacteristic.writeValue(encoder.encode(packet));
+    currentBaseAngle = base;
+    currentJointAngle = joint;
 }
 
-// Live real-time slider handler
+// LERP Smoothed Movement Pipeline
+async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 15) {
+    const startBase = currentBaseAngle;
+    const startJoint = currentJointAngle;
+
+    const baseDelta = Math.abs(targetBase - startBase);
+    const jointDelta = Math.abs(targetJoint - startJoint);
+    const maxDelta = Math.max(baseDelta, jointDelta);
+
+    // Number of interpolated sub-steps (1 step per degree of max motion)
+    const steps = Math.max(1, Math.ceil(maxDelta));
+
+    for (let i = 1; i <= steps; i++) {
+        if (shouldAbort) break;
+        const t = i / steps;
+        const interpBase = startBase + (targetBase - startBase) * t;
+        const interpJoint = startJoint + (targetJoint - startJoint) * t;
+
+        await sendPacket(interpBase, interpJoint, penState);
+        await new Promise(r => setTimeout(r, stepDelayMs));
+    }
+}
+
 async function handleSliderInput() {
-    const base = document.getElementById("baseSlider").value;
-    const joint = document.getElementById("jointSlider").value;
+    const base = parseFloat(document.getElementById("baseSlider").value);
+    const joint = parseFloat(document.getElementById("jointSlider").value);
     document.getElementById("baseVal").innerText = base;
     document.getElementById("jointVal").innerText = joint;
 
@@ -367,7 +423,19 @@ function togglePen(state) {
     handleSliderInput();
 }
 
-function moveToTarget() {
+function predictAngles(x, y) {
+    const normX = (x - normBounds.minX) / (normBounds.maxX - normBounds.minX);
+    const normY = (y - normBounds.minY) / (normBounds.maxY - normBounds.minY);
+
+    const output = net.run({ x: normX, y: normY });
+
+    const predBase = Math.round(output.base * (normBounds.maxBase - normBounds.minBase) + normBounds.minBase);
+    const predJoint = Math.round(output.joint * (normBounds.maxJoint - normBounds.minJoint) + normBounds.minJoint);
+
+    return { base: predBase, joint: predJoint };
+}
+
+async function moveToTarget() {
     if (!isTrained || !net) {
         alert("Train the Neural Network model first!");
         return;
@@ -380,26 +448,202 @@ function moveToTarget() {
         return;
     }
 
-    // Dynamic Normalization for Target Input
-    const normX = (tx - normBounds.minX) / (normBounds.maxX - normBounds.minX);
-    const normY = (ty - normBounds.minY) / (normBounds.maxY - normBounds.minY);
+    const target = predictAngles(tx, ty);
 
-    // Run prediction
-    const output = net.run({ x: normX, y: normY });
-
-    // Reverse Min-Max Scaling to recover actual angles
-    const predBase = Math.round(output.base * (normBounds.maxBase - normBounds.minBase) + normBounds.minBase);
-    const predJoint = Math.round(output.joint * (normBounds.maxJoint - normBounds.minJoint) + normBounds.minJoint);
-
-    // Update readout UI
     document.getElementById("outX").innerText = tx;
     document.getElementById("outY").innerText = ty;
-    document.getElementById("outBase").innerText = predBase;
-    document.getElementById("outJoint").innerText = predJoint;
+    document.getElementById("outBase").innerText = target.base;
+    document.getElementById("outJoint").innerText = target.joint;
     document.getElementById("predictionDisplay").style.display = "block";
 
-    // Transmit over Bluetooth
-    sendPacket(predBase, predJoint, currentPenState);
+    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 15;
+    await lerpMove(target.base, target.joint, currentPenState, delay);
+}
+
+// ==================== SVG PARSER & ENGINE ==================== //
+
+function handleSVGUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        parseSVGData(e.target.result);
+    };
+    reader.readAsText(file);
+}
+
+function parseSVGData(svgText) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgText, "image/svg+xml");
+    const svgEl = doc.querySelector("svg");
+
+    if (!svgEl) {
+        alert("Invalid SVG file format.");
+        return;
+    }
+
+    parsedPaths = [];
+    let rawMinX = Infinity, rawMaxX = -Infinity, rawMinY = Infinity, rawMaxY = -Infinity;
+
+    const pathElements = doc.querySelectorAll("path, polygon, polyline, line, rect, circle");
+    
+    pathElements.forEach(el => {
+        let pathObj = { points: [] };
+        
+        if (el.tagName.toLowerCase() === 'path') {
+            const d = el.getAttribute("d");
+            if (d) {
+                const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                tempPath.setAttribute("d", d);
+                const length = tempPath.getTotalLength();
+                const step = Math.max(1, length / 40); // Sample ~40 points per stroke
+                
+                for (let i = 0; i <= length; i += step) {
+                    const pt = tempPath.getPointAtLength(i);
+                    pathObj.points.push({ x: pt.x, y: pt.y });
+                    rawMinX = Math.min(rawMinX, pt.x); rawMaxX = Math.max(rawMaxX, pt.x);
+                    rawMinY = Math.min(rawMinY, pt.y); rawMaxY = Math.max(rawMaxY, pt.y);
+                }
+            }
+        }
+        if (pathObj.points.length > 0) {
+            parsedPaths.push(pathObj);
+        }
+    });
+
+    if (parsedPaths.length === 0) {
+        alert("No readable vector paths found in SVG!");
+        return;
+    }
+
+    updateNormalizationBounds();
+    const svgWidth = rawMaxX - rawMinX || 1;
+    const svgHeight = rawMaxY - rawMinY || 1;
+    const targetWidth = (normBounds.maxX - normBounds.minX) * 0.8;
+    const targetHeight = (normBounds.maxY - normBounds.minY) * 0.8;
+
+    const scale = Math.min(targetWidth / svgWidth, targetHeight / svgHeight);
+    const offsetX = normBounds.minX + (normBounds.maxX - normBounds.minX - svgWidth * scale) / 2;
+    const offsetY = normBounds.minY + (normBounds.maxY - normBounds.minY - svgHeight * scale) / 2;
+
+    parsedPaths.forEach(path => {
+        path.points = path.points.map(pt => ({
+            x: (pt.x - rawMinX) * scale + offsetX,
+            y: (pt.y - rawMinY) * scale + offsetY
+        }));
+    });
+
+    document.getElementById("plotStatusText").innerText = `Loaded SVG with ${parsedPaths.length} stroke segments.`;
+    if (isTrained) {
+        document.getElementById("startPlotBtn").disabled = false;
+    }
+    renderCanvasPreview();
+}
+
+function renderCanvasPreview(activePt = null) {
+    const canvas = document.getElementById("previewCanvas");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (parsedPaths.length === 0) return;
+
+    const scaleX = canvas.width / (normBounds.maxX - normBounds.minX || 1);
+    const scaleY = canvas.height / (normBounds.maxY - normBounds.minY || 1);
+
+    ctx.strokeStyle = "#333";
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = "#007aff";
+    ctx.lineWidth = 2;
+    parsedPaths.forEach(path => {
+        ctx.beginPath();
+        path.points.forEach((pt, idx) => {
+            const cx = (pt.x - normBounds.minX) * scaleX;
+            const cy = canvas.height - ((pt.y - normBounds.minY) * scaleY);
+            if (idx === 0) ctx.moveTo(cx, cy);
+            else ctx.lineTo(cx, cy);
+        });
+        ctx.stroke();
+    });
+
+    if (activePt) {
+        const curX = (activePt.x - normBounds.minX) * scaleX;
+        const curY = canvas.height - ((activePt.y - normBounds.minY) * scaleY);
+        ctx.fillStyle = "#ff3b30";
+        ctx.beginPath();
+        ctx.arc(curX, curY, 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+async function startPlotting() {
+    if (!isTrained || !net) {
+        alert("Train neural network first!");
+        return;
+    }
+    if (!rxCharacteristic) {
+        alert("Connect Bluetooth first!");
+        return;
+    }
+
+    isPlotting = true;
+    shouldAbort = false;
+    document.getElementById("startPlotBtn").disabled = true;
+    document.getElementById("stopPlotBtn").disabled = false;
+
+    const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 15;
+
+    let totalPoints = 0;
+    parsedPaths.forEach(p => totalPoints += p.points.length);
+    let currentPointIndex = 0;
+
+    for (let pIdx = 0; pIdx < parsedPaths.length; pIdx++) {
+        if (shouldAbort) break;
+
+        const path = parsedPaths[pIdx];
+
+        // 1. Pen UP & LERP move to start of stroke
+        const startTarget = predictAngles(path.points[0].x, path.points[0].y);
+        await lerpMove(startTarget.base, startTarget.joint, 0, lerpDelayMs);
+        await new Promise(r => setTimeout(r, 200));
+
+        // 2. Lower Pen
+        await sendPacket(startTarget.base, startTarget.joint, 1);
+        await new Promise(r => setTimeout(r, 200));
+
+        // 3. Trace stroke with LERP interpolation
+        for (let ptIdx = 0; ptIdx < path.points.length; ptIdx++) {
+            if (shouldAbort) break;
+
+            const pt = path.points[ptIdx];
+            const angles = predictAngles(pt.x, pt.y);
+
+            await lerpMove(angles.base, angles.joint, 1, lerpDelayMs);
+            
+            currentPointIndex++;
+            const pct = Math.round((currentPointIndex / totalPoints) * 100);
+            document.getElementById("plotProgress").style.width = pct + "%";
+            document.getElementById("plotStatusText").innerText = `Plotting... ${pct}%`;
+            renderCanvasPreview(pt);
+        }
+
+        // 4. Raise Pen after completing stroke
+        const lastPt = path.points[path.points.length - 1];
+        const endTarget = predictAngles(lastPt.x, lastPt.y);
+        await sendPacket(endTarget.base, endTarget.joint, 0);
+        await new Promise(r => setTimeout(r, 150));
+    }
+
+    isPlotting = false;
+    document.getElementById("startPlotBtn").disabled = false;
+    document.getElementById("stopPlotBtn").disabled = true;
+    document.getElementById("plotStatusText").innerText = shouldAbort ? "Plot Aborted!" : "Plot Completed Successfully!";
+    renderCanvasPreview();
+}
+
+function stopPlotting() {
+    shouldAbort = true;
 }
 </script>
 </body>
