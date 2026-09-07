@@ -2,416 +2,493 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+
 <meta name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      content="width=device-width,
+               initial-scale=1.0,
+               maximum-scale=1.0,
+               user-scalable=no">
 
 <title>SCARA Wireless Plotter</title>
 
 <style>
-    * {
-        box-sizing: border-box;
-    }
 
-    body {
-        margin: 0;
-        padding: 15px;
-        background: #121212;
-        color: #eee;
-        font-family: Arial, sans-serif;
-    }
+* {
+    box-sizing: border-box;
+}
 
-    h1 {
-        margin: 0 0 15px;
-        font-size: 24px;
-    }
+body {
+    margin: 0;
+    padding: 15px;
+    background: #121212;
+    color: #eeeeee;
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Arial,
+        sans-serif;
+}
 
-    h2 {
-        font-size: 18px;
-        margin: 0 0 10px;
-    }
+h1 {
+    font-size: 24px;
+    margin: 0 0 15px;
+}
 
-    .card {
-        background: #1e1e1e;
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 15px;
-    }
+h2 {
+    font-size: 18px;
+    margin: 0 0 12px;
+}
 
-    button,
-    input[type="file"] {
-        width: 100%;
-        margin: 5px 0;
-    }
+.card {
+    background: #1e1e1e;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
 
-    button {
-        border: none;
-        border-radius: 8px;
-        padding: 12px;
-        font-size: 15px;
-        background: #333;
-        color: white;
-        cursor: pointer;
-    }
+button {
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 5px 0;
+    background: #333333;
+    color: white;
+    font-size: 15px;
+    cursor: pointer;
+}
 
-    button:active {
-        transform: scale(0.98);
-    }
+button:active {
+    transform: scale(0.98);
+}
 
-    button:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-    }
+button:disabled {
+    opacity: 0.4;
+}
 
-    .connect {
-        background: #1565c0;
-    }
+.connect {
+    background: #1565c0;
+}
 
-    .green {
-        background: #287d35;
-    }
+.green {
+    background: #287d35;
+}
 
-    .red {
-        background: #a52828;
-    }
+.red {
+    background: #a52828;
+}
 
-    .orange {
-        background: #9a6500;
-    }
+.orange {
+    background: #9a6500;
+}
 
-    label {
-        display: block;
-        margin-top: 10px;
-        margin-bottom: 5px;
-    }
+.row {
+    display: flex;
+    gap: 7px;
+}
 
-    input[type="range"] {
-        width: 100%;
-    }
+.row button {
+    flex: 1;
+}
 
-    input[type="number"] {
-        width: 100%;
-        padding: 9px;
-        border-radius: 6px;
-        border: 1px solid #555;
-        background: #292929;
-        color: white;
-    }
+label {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
 
-    .row {
-        display: flex;
-        gap: 8px;
-    }
+input[type="range"] {
+    width: 100%;
+}
 
-    .row button {
-        flex: 1;
-    }
+input[type="file"] {
+    width: 100%;
+    padding: 8px;
+    color: white;
+}
 
-    .status {
-        padding: 10px;
-        border-radius: 8px;
-        background: #292929;
-        margin-top: 10px;
-        font-size: 14px;
-    }
+.value {
+    float: right;
+    color: #64b5f6;
+}
 
-    .value {
-        float: right;
-        color: #64b5f6;
-    }
+.status {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #292929;
+    font-size: 14px;
+}
 
-    #previewWrapper {
-        width: 100%;
-        position: relative;
-        overflow: hidden;
-        border-radius: 10px;
-        background: #080808;
-        border: 1px solid #444;
-        touch-action: none;
-    }
+.hint {
+    color: #aaaaaa;
+    font-size: 13px;
+    line-height: 1.45;
+    margin-top: 10px;
+}
 
-    #preview {
-        display: block;
-        width: 100%;
-        height: auto;
-        touch-action: none;
-        user-select: none;
-    }
+#previewWrapper {
+    width: 100%;
+    background: #080808;
+    border: 1px solid #444;
+    border-radius: 10px;
+    overflow: hidden;
 
-    .hint {
-        color: #aaa;
-        font-size: 13px;
-        margin-top: 8px;
-        line-height: 1.4;
-    }
+    /*
+       VERY IMPORTANT FOR PHONE TOUCH DRAGGING
+    */
+    touch-action: none;
+}
 
-    #log {
-        background: #080808;
-        border-radius: 8px;
-        padding: 10px;
-        height: 150px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-        font-family: monospace;
-        font-size: 12px;
-    }
+#preview {
+    display: block;
+    width: 100%;
+    height: auto;
 
-    .reachable {
-        color: #81c784;
-    }
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
 
-    .unreachable {
-        color: #ef5350;
-    }
+#log {
+    background: #080808;
+    border-radius: 8px;
+    padding: 10px;
+    height: 160px;
+    overflow-y: auto;
+
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.good {
+    color: #81c784;
+}
+
+.bad {
+    color: #ef5350;
+}
+
 </style>
 </head>
+
 
 <body>
 
 <h1>🤖 SCARA Wireless Plotter</h1>
 
-<!-- ================= BLE ================= -->
+
+<!-- =========================================================
+     BLUETOOTH
+========================================================= -->
 
 <div class="card">
-    <h2>📡 Bluetooth</h2>
 
-    <button id="connectBtn" class="connect">
-        Connect to SCARA
-    </button>
+<h2>📡 Bluetooth</h2>
 
-    <div id="bleStatus" class="status">
-        Not connected
-    </div>
+<button
+    id="connectBtn"
+    class="connect">
+    Connect to SCARA
+</button>
+
+<div
+    id="bleStatus"
+    class="status">
+    Not connected
 </div>
-
-
-<!-- ================= ARM ================= -->
-
-<div class="card">
-
-    <h2>⚙️ Arm Settings</h2>
-
-    <label>
-        Link 1
-        <span class="value">120 mm</span>
-    </label>
-
-    <label>
-        Link 2
-        <span class="value">220 mm</span>
-    </label>
-
-    <div class="status">
-        Maximum reach:
-        <b>340 mm</b>
-        <br>
-        Minimum reach:
-        <b>100 mm</b>
-    </div>
 
 </div>
 
 
-<!-- ================= MANUAL ================= -->
+<!-- =========================================================
+     ARM INFORMATION
+========================================================= -->
 
 <div class="card">
 
-    <h2>🎮 Manual Control</h2>
+<h2>⚙️ Arm</h2>
 
-    <label>
-        Base
-        <span id="baseValue" class="value">90°</span>
-    </label>
+<div class="status">
 
-    <input
-        id="baseSlider"
-        type="range"
-        min="0"
-        max="180"
-        value="90"
-    >
+Link 1:
+<b>120 mm</b>
 
-    <label>
-        Joint
-        <span id="jointValue" class="value">90°</span>
-    </label>
+<br>
 
-    <input
-        id="jointSlider"
-        type="range"
-        min="0"
-        max="180"
-        value="90"
-    >
+Link 2:
+<b>220 mm</b>
 
-    <div class="row">
-        <button id="sendManualBtn">
-            Move
-        </button>
+<br><br>
 
-        <button id="penUpBtn">
-            ✏️ Pen UP
-        </button>
+Maximum reach:
+<b>340 mm</b>
 
-        <button id="penDownBtn">
-            🖊️ Pen DOWN
-        </button>
-    </div>
+<br>
+
+Minimum radius:
+<b>100 mm</b>
+
+</div>
 
 </div>
 
 
-<!-- ================= CARTESIAN ================= -->
+<!-- =========================================================
+     MANUAL CONTROL
+========================================================= -->
 
 <div class="card">
 
-    <h2>📍 Cartesian Position</h2>
+<h2>🎮 Manual Servo Control</h2>
 
-    <label>X (mm)</label>
-    <input
-        id="xInput"
-        type="number"
-        value="200"
-        step="1"
-    >
+<label>
+Base
+<span
+    id="baseValue"
+    class="value">
+    90°
+</span>
+</label>
 
-    <label>Y (mm)</label>
-    <input
-        id="yInput"
-        type="number"
-        value="100"
-        step="1"
-    >
+<input
+    id="baseSlider"
+    type="range"
+    min="0"
+    max="180"
+    value="90">
 
-    <button id="moveXYBtn" class="green">
-        Move to X/Y
-    </button>
 
-    <div id="ikStatus" class="status">
-        Enter a coordinate.
-    </div>
+<label>
+Joint
+<span
+    id="jointValue"
+    class="value">
+    90°
+</span>
+</label>
+
+<input
+    id="jointSlider"
+    type="range"
+    min="0"
+    max="180"
+    value="90">
+
+
+<button id="moveManualBtn">
+    Move
+</button>
+
+
+<div class="row">
+
+<button id="penUpBtn">
+    ✏️ Pen UP
+</button>
+
+<button id="penDownBtn">
+    🖊️ Pen DOWN
+</button>
+
+</div>
 
 </div>
 
 
-<!-- ================= SVG ================= -->
+<!-- =========================================================
+     SVG
+========================================================= -->
 
 <div class="card">
 
-    <h2>🖼️ Drawing</h2>
+<h2>🖼️ Drawing</h2>
 
-    <input
-        id="svgFile"
-        type="file"
-        accept=".svg,image/svg+xml"
-    >
+<input
+    id="svgFile"
+    type="file"
+    accept=".svg,image/svg+xml">
 
-    <label>
-        Drawing Scale
-        <span id="scaleValue" class="value">1.00×</span>
-    </label>
 
-    <input
-        id="scaleSlider"
-        type="range"
-        min="0.1"
-        max="3"
-        value="1"
-        step="0.05"
-    >
+<label>
+    Scale
+    <span
+        id="scaleValue"
+        class="value">
+        1.00×
+    </span>
+</label>
 
-    <div class="row">
-        <button id="centerBtn">
-            🎯 Center
-        </button>
+<input
+    id="scaleSlider"
+    type="range"
+    min="0.1"
+    max="3"
+    step="0.05"
+    value="1">
 
-        <button id="resetBtn">
-            🔄 Reset
-        </button>
-    </div>
 
-    <div class="hint">
-        👆 Drag the drawing directly on the grid to position it.
-        <br>
-        The grid uses real millimetres and the SCARA base is at (0,0).
-    </div>
+<div class="row">
+
+<button id="centerBtn">
+    🎯 Center
+</button>
+
+<button id="resetBtn">
+    🔄 Reset
+</button>
 
 </div>
 
 
-<!-- ================= PREVIEW ================= -->
+<div class="hint">
 
-<div class="card">
+👆 <b>Drag the drawing directly</b> on the grid.
 
-    <h2>📐 Workspace</h2>
+<br>
 
-    <div id="previewWrapper">
-        <canvas id="preview"></canvas>
-    </div>
+📱 Works with touch.
 
-    <div id="workspaceStatus" class="status">
-        No drawing loaded.
-    </div>
+<br>
+
+📐 The grid is in millimetres.
+
+<br>
+
+🎯 The SCARA base is at <b>(0,0)</b>.
+
+</div>
 
 </div>
 
 
-<!-- ================= PLOT ================= -->
+<!-- =========================================================
+     WORKSPACE
+========================================================= -->
 
 <div class="card">
 
-    <h2>🖊️ Plot</h2>
+<h2>📐 SCARA Workspace</h2>
 
-    <label>
-        Point Delay (ms)
-        <span id="delayValue" class="value">20</span>
-    </label>
+<div id="previewWrapper">
 
-    <input
-        id="delaySlider"
-        type="range"
-        min="5"
-        max="200"
-        value="20"
-        step="5"
-    >
-
-    <button id="startBtn" class="green" disabled>
-        ▶ Start Plot
-    </button>
-
-    <button id="abortBtn" class="red" disabled>
-        ⛔ Abort
-    </button>
-
-    <div id="progress" class="status">
-        Ready
-    </div>
+<canvas id="preview"></canvas>
 
 </div>
 
 
-<!-- ================= DEBUG ================= -->
+<div
+    id="workspaceStatus"
+    class="status">
+
+No SVG loaded.
+
+</div>
+
+</div>
+
+
+<!-- =========================================================
+     PLOT
+========================================================= -->
 
 <div class="card">
 
-    <h2>🛠 Debug</h2>
+<h2>🖊️ Plot</h2>
 
-    <div id="log"></div>
+
+<label>
+
+Point delay
+
+<span
+    id="delayValue"
+    class="value">
+
+20 ms
+
+</span>
+
+</label>
+
+
+<input
+    id="delaySlider"
+    type="range"
+    min="5"
+    max="200"
+    step="5"
+    value="20">
+
+
+<button
+    id="startBtn"
+    class="green"
+    disabled>
+
+▶ Start Plot
+
+</button>
+
+
+<button
+    id="abortBtn"
+    class="red"
+    disabled>
+
+⛔ Abort
+
+</button>
+
+
+<div
+    id="progress"
+    class="status">
+
+Ready
 
 </div>
+
+</div>
+
+
+<!-- =========================================================
+     DEBUG
+========================================================= -->
+
+<div class="card">
+
+<h2>🛠 Debug Log</h2>
+
+<div id="log"></div>
+
+</div>
+
 
 
 <script>
 
-/* ============================================================
-   CONFIGURATION
-============================================================ */
+/* =========================================================
+   CONFIG
+========================================================= */
 
 const L1 = 120;
 const L2 = 220;
 
+
+/*
+   YOUR CURRENT CALIBRATION
+*/
+
 const BASE_OFF = 65;
 const JOINT_OFF = 175;
+
+
+/*
+   BLE UUIDs
+*/
 
 const SERVICE_UUID =
     "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -420,86 +497,110 @@ const RX_UUID =
     "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
 
-/* ============================================================
-   GLOBALS
-============================================================ */
+/* =========================================================
+   STATE
+========================================================= */
 
 let device = null;
 let characteristic = null;
 
-let penState = 0;
-
 let currentBase = 90;
 let currentJoint = 90;
 
-let svgStrokes = [];
+let penState = 0;
+
 let svgLoaded = false;
 
-let svgScale = 1;
+let originalStrokes = [];
+let svgStrokes = [];
 
 let svgOffsetX = 0;
 let svgOffsetY = 0;
 
-let originalStrokes = [];
+let svgScale = 1;
 
 let plotting = false;
 let abortPlot = false;
 
 
-/* ============================================================
+/* =========================================================
    CANVAS
-============================================================ */
+========================================================= */
 
-const canvas = document.getElementById("preview");
-const ctx = canvas.getContext("2d");
+const canvas =
+    document.getElementById("preview");
 
-const wrapper = document.getElementById("previewWrapper");
+const ctx =
+    canvas.getContext("2d");
 
-let canvasWidth = 700;
-let canvasHeight = 700;
+const wrapper =
+    document.getElementById("previewWrapper");
 
-let pixelsPerMM = 0.9;
-
-
-/*
-    We show approximately:
-
-       -350      0       +350
-         |------|--------|
-         |
-       +Y
-         |
-       (0,0)
-         |
-       -Y
-
-    Maximum arm reach = 340 mm.
-*/
 
 const VIEW_MM = 380;
 
+let canvasWidth = 350;
+let canvasHeight = 350;
 
-/* ============================================================
-   LOGGING
-============================================================ */
+let pixelsPerMM = 0.45;
 
-function log(message) {
 
-    const box = document.getElementById("log");
+/* =========================================================
+   SAFE LOG
+========================================================= */
+
+function log(text) {
+
+    const box =
+        document.getElementById("log");
+
+    if (!box)
+        return;
 
     const time =
         new Date().toLocaleTimeString();
 
     box.textContent +=
-        `[${time}] ${message}\n`;
+        "[" + time + "] " +
+        text +
+        "\n";
 
-    box.scrollTop = box.scrollHeight;
+    box.scrollTop =
+        box.scrollHeight;
 }
 
 
-/* ============================================================
+/* =========================================================
+   GLOBAL ERROR HANDLER
+========================================================= */
+
+window.addEventListener(
+    "error",
+    function(event) {
+
+        log(
+            "JAVASCRIPT ERROR: " +
+            event.message
+        );
+    }
+);
+
+
+window.addEventListener(
+    "unhandledrejection",
+    function(event) {
+
+        log(
+            "PROMISE ERROR: " +
+            event.reason
+        );
+    }
+);
+
+
+/* =========================================================
    CANVAS RESIZE
-============================================================ */
+========================================================= */
 
 function resizeCanvas() {
 
@@ -509,20 +610,28 @@ function resizeCanvas() {
     const dpr =
         window.devicePixelRatio || 1;
 
+
     canvasWidth = width;
     canvasHeight = width;
 
+
     canvas.width =
-        Math.round(width * dpr);
+        Math.round(
+            width * dpr
+        );
 
     canvas.height =
-        Math.round(width * dpr);
+        Math.round(
+            width * dpr
+        );
+
 
     canvas.style.width =
         width + "px";
 
     canvas.style.height =
         width + "px";
+
 
     ctx.setTransform(
         dpr,
@@ -533,11 +642,15 @@ function resizeCanvas() {
         0
     );
 
+
     pixelsPerMM =
-        width / (VIEW_MM * 2);
+        width /
+        (VIEW_MM * 2);
+
 
     drawPreview();
 }
+
 
 window.addEventListener(
     "resize",
@@ -545,13 +658,14 @@ window.addEventListener(
 );
 
 
-/* ============================================================
-   COORDINATE CONVERSION
-============================================================ */
+/* =========================================================
+   COORDINATE SYSTEM
+========================================================= */
 
 function mmToCanvas(x, y) {
 
     return {
+
         x:
             canvasWidth / 2 +
             x * pixelsPerMM,
@@ -566,24 +680,25 @@ function mmToCanvas(x, y) {
 function canvasToMM(px, py) {
 
     return {
+
         x:
-            (px - canvasWidth / 2) /
+            (px -
+             canvasWidth / 2) /
             pixelsPerMM,
 
         y:
-            (canvasHeight / 2 - py) /
+            (canvasHeight / 2 -
+             py) /
             pixelsPerMM
     };
 }
 
 
-/* ============================================================
-   GRID
-============================================================ */
+/* =========================================================
+   DRAW GRID
+========================================================= */
 
 function drawGrid() {
-
-    ctx.save();
 
     ctx.clearRect(
         0,
@@ -592,11 +707,9 @@ function drawGrid() {
         canvasHeight
     );
 
-    /*
-        Background
-    */
 
-    ctx.fillStyle = "#090909";
+    ctx.fillStyle =
+        "#090909";
 
     ctx.fillRect(
         0,
@@ -607,7 +720,7 @@ function drawGrid() {
 
 
     /*
-        Grid
+       GRID
     */
 
     for (
@@ -616,27 +729,29 @@ function drawGrid() {
         mm += 20
     ) {
 
-        const p1 =
-            mmToCanvas(mm, -VIEW_MM);
+        const vertical =
+            mmToCanvas(
+                mm,
+                0
+            );
 
-        const p2 =
-            mmToCanvas(mm, VIEW_MM);
 
         ctx.beginPath();
 
         ctx.moveTo(
-            p1.x,
-            p1.y
+            vertical.x,
+            0
         );
 
         ctx.lineTo(
-            p2.x,
-            p2.y
+            vertical.x,
+            canvasHeight
         );
+
 
         ctx.strokeStyle =
             mm % 100 === 0
-                ? "#333"
+                ? "#333333"
                 : "#1d1d1d";
 
         ctx.lineWidth =
@@ -647,46 +762,43 @@ function drawGrid() {
         ctx.stroke();
 
 
-        const p3 =
-            mmToCanvas(-VIEW_MM, mm);
+        const horizontal =
+            mmToCanvas(
+                0,
+                mm
+            );
 
-        const p4 =
-            mmToCanvas(VIEW_MM, mm);
 
         ctx.beginPath();
 
         ctx.moveTo(
-            p3.x,
-            p3.y
+            0,
+            horizontal.y
         );
 
         ctx.lineTo(
-            p4.x,
-            p4.y
+            canvasWidth,
+            horizontal.y
         );
-
-        ctx.strokeStyle =
-            mm % 100 === 0
-                ? "#333"
-                : "#1d1d1d";
 
         ctx.stroke();
     }
 
 
     /*
-        Axes
+       ORIGIN
     */
 
     const origin =
-        mmToCanvas(0, 0);
+        mmToCanvas(
+            0,
+            0
+        );
 
 
-    ctx.strokeStyle = "#888";
-    ctx.lineWidth = 1.5;
-
-
-    /* X axis */
+    /*
+       X AXIS
+    */
 
     ctx.beginPath();
 
@@ -700,10 +812,17 @@ function drawGrid() {
         origin.y
     );
 
+    ctx.strokeStyle =
+        "#888888";
+
+    ctx.lineWidth = 1.5;
+
     ctx.stroke();
 
 
-    /* Y axis */
+    /*
+       Y AXIS
+    */
 
     ctx.beginPath();
 
@@ -721,58 +840,57 @@ function drawGrid() {
 
 
     /*
-        Reach circles
+       MAXIMUM REACH
+       340mm
     */
 
-    const outer =
-        L1 + L2;
+    ctx.beginPath();
 
-    const inner =
-        Math.abs(L2 - L1);
+    ctx.arc(
+        origin.x,
+        origin.y,
+        340 * pixelsPerMM,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.setLineDash([
+        7,
+        5
+    ]);
+
+    ctx.strokeStyle =
+        "#62a66b";
+
+    ctx.stroke();
 
 
-    /* Outer reach */
+    /*
+       INNER UNREACHABLE
+       100mm
+    */
 
     ctx.beginPath();
 
     ctx.arc(
         origin.x,
         origin.y,
-        outer * pixelsPerMM,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.setLineDash([7, 5]);
-
-    ctx.strokeStyle =
-        "rgba(100,220,120,0.8)";
-
-    ctx.stroke();
-
-
-    /* Inner unreachable area */
-
-    ctx.beginPath();
-
-    ctx.arc(
-        origin.x,
-        origin.y,
-        inner * pixelsPerMM,
+        100 * pixelsPerMM,
         0,
         Math.PI * 2
     );
 
     ctx.strokeStyle =
-        "rgba(230,80,80,0.8)";
+        "#a85b5b";
 
     ctx.stroke();
+
 
     ctx.setLineDash([]);
 
 
     /*
-        Origin
+       ORIGIN DOT
     */
 
     ctx.beginPath();
@@ -792,36 +910,39 @@ function drawGrid() {
 
 
     /*
-        Labels
+       LABELS
     */
 
     ctx.font =
         "12px Arial";
 
     ctx.fillStyle =
-        "#aaa";
+        "#bbbbbb";
+
 
     ctx.fillText(
-        "0,0",
-        origin.x + 7,
-        origin.y - 7
+        "(0,0)",
+        origin.x + 8,
+        origin.y - 8
     );
+
 
     ctx.fillText(
         "X",
-        canvasWidth - 15,
-        origin.y - 7
+        canvasWidth - 16,
+        origin.y - 8
     );
+
 
     ctx.fillText(
         "Y",
-        origin.x + 7,
+        origin.x + 8,
         15
     );
 
 
     /*
-        100 / 200 / 300 mm labels
+       DISTANCE LABELS
     */
 
     for (
@@ -831,7 +952,10 @@ function drawGrid() {
     ) {
 
         const px =
-            mmToCanvas(mm, 0);
+            mmToCanvas(
+                mm,
+                0
+            );
 
         ctx.fillText(
             mm,
@@ -839,70 +963,84 @@ function drawGrid() {
             origin.y + 15
         );
 
+
         const py =
-            mmToCanvas(0, mm);
+            mmToCanvas(
+                0,
+                mm
+            );
 
         ctx.fillText(
             mm,
-            origin.x + 7,
+            origin.x + 8,
             py.y + 4
         );
     }
 
 
-    /*
-        Reach labels
-    */
-
     ctx.fillStyle =
         "#81c784";
 
     ctx.fillText(
-        "340 mm max",
+        "340 mm",
         origin.x +
         340 * pixelsPerMM -
-        65,
+        25,
         origin.y - 8
     );
 
+
     ctx.fillStyle =
-        "#ef5350";
+        "#ef7777";
 
     ctx.fillText(
-        "100 mm min",
+        "100 mm",
         origin.x +
         100 * pixelsPerMM -
-        65,
-        origin.y + 25
+        25,
+        origin.y + 24
     );
-
-
-    ctx.restore();
 }
 
 
-/* ============================================================
+/* =========================================================
    DRAW SVG
-============================================================ */
+========================================================= */
 
 function drawSVG() {
 
     if (!svgLoaded)
         return;
 
+
     ctx.save();
 
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
 
-    for (const stroke of svgStrokes) {
+    ctx.strokeStyle =
+        "#ffffff";
 
-        if (stroke.length < 2)
+    ctx.lineWidth =
+        1.7;
+
+    ctx.lineJoin =
+        "round";
+
+    ctx.lineCap =
+        "round";
+
+
+    for (
+        const stroke of svgStrokes
+    ) {
+
+        if (
+            stroke.length < 2
+        )
             continue;
 
+
         ctx.beginPath();
+
 
         for (
             let i = 0;
@@ -910,44 +1048,57 @@ function drawSVG() {
             i++
         ) {
 
-            const pt =
+            const point =
                 stroke[i];
 
-            const p =
-                mmToCanvas(
-                    svgOffsetX +
-                    pt.x * svgScale,
 
-                    svgOffsetY +
-                    pt.y * svgScale
+            const x =
+                svgOffsetX +
+                point.x *
+                svgScale;
+
+
+            const y =
+                svgOffsetY +
+                point.y *
+                svgScale;
+
+
+            const screen =
+                mmToCanvas(
+                    x,
+                    y
                 );
+
 
             if (i === 0) {
 
                 ctx.moveTo(
-                    p.x,
-                    p.y
+                    screen.x,
+                    screen.y
                 );
 
             } else {
 
                 ctx.lineTo(
-                    p.x,
-                    p.y
+                    screen.x,
+                    screen.y
                 );
             }
         }
 
+
         ctx.stroke();
     }
+
 
     ctx.restore();
 }
 
 
-/* ============================================================
-   COMPLETE PREVIEW
-============================================================ */
+/* =========================================================
+   PREVIEW
+========================================================= */
 
 function drawPreview() {
 
@@ -957,14 +1108,18 @@ function drawPreview() {
 }
 
 
-/* ============================================================
-   SVG PARSING
-============================================================ */
+/* =========================================================
+   SVG PARSER
+========================================================= */
 
 function parseSVG(text) {
 
+    log("Parsing SVG...");
+
+
     const parser =
         new DOMParser();
+
 
     const doc =
         parser.parseFromString(
@@ -972,273 +1127,274 @@ function parseSVG(text) {
             "image/svg+xml"
         );
 
+
+    const parserError =
+        doc.querySelector(
+            "parsererror"
+        );
+
+
+    if (parserError) {
+
+        alert(
+            "Invalid SVG file."
+        );
+
+        log(
+            "SVG parser error."
+        );
+
+        return;
+    }
+
+
     const strokes = [];
 
+
     /*
-        PATH
+       PATH
     */
 
     const paths =
-        doc.querySelectorAll("path");
+        doc.querySelectorAll(
+            "path"
+        );
 
-    paths.forEach(path => {
 
-        try {
+    paths.forEach(
+        path => {
 
-            const length =
-                path.getTotalLength();
+            try {
 
-            const points = [];
+                const length =
+                    path.getTotalLength();
 
-            const samples =
-                Math.max(
-                    2,
-                    Math.ceil(length / 3)
-                );
 
-            for (
-                let i = 0;
-                i <= samples;
-                i++
-            ) {
+                const points = [];
 
-                const p =
-                    path.getPointAtLength(
-                        length *
-                        i /
-                        samples
+
+                const samples =
+                    Math.max(
+                        2,
+                        Math.ceil(
+                            length / 3
+                        )
                     );
 
-                points.push({
-                    x: p.x,
-                    y: p.y
-                });
+
+                for (
+                    let i = 0;
+                    i <= samples;
+                    i++
+                ) {
+
+                    const p =
+                        path.getPointAtLength(
+                            length *
+                            i /
+                            samples
+                        );
+
+
+                    points.push({
+                        x: p.x,
+                        y: p.y
+                    });
+                }
+
+
+                if (
+                    points.length > 1
+                ) {
+
+                    strokes.push(
+                        points
+                    );
+                }
+
+            } catch (error) {
+
+                log(
+                    "Could not read PATH."
+                );
             }
-
-            if (points.length > 1)
-                strokes.push(points);
-
-        } catch (e) {
-
-            log(
-                "Could not read path"
-            );
         }
-    });
+    );
 
 
     /*
-        POLYLINE / POLYGON
+       POLYLINE / POLYGON
     */
 
     doc.querySelectorAll(
         "polyline, polygon"
-    ).forEach(el => {
+    ).forEach(
+        element => {
 
-        const raw =
-            el.getAttribute("points");
+            const raw =
+                element.getAttribute(
+                    "points"
+                );
 
-        if (!raw)
-            return;
 
-        const numbers =
-            raw.trim()
-                .split(/[\s,]+/)
-                .map(Number);
+            if (!raw)
+                return;
 
-        const points = [];
 
-        for (
-            let i = 0;
-            i + 1 < numbers.length;
-            i += 2
-        ) {
+            const numbers =
+                raw
+                    .trim()
+                    .split(
+                        /[\s,]+/
+                    )
+                    .map(Number);
 
-            points.push({
-                x: numbers[i],
-                y: numbers[i + 1]
-            });
+
+            const points = [];
+
+
+            for (
+                let i = 0;
+                i + 1 < numbers.length;
+                i += 2
+            ) {
+
+                points.push({
+                    x: numbers[i],
+                    y: numbers[i + 1]
+                });
+            }
+
+
+            if (
+                element.tagName
+                    .toLowerCase() ===
+                "polygon"
+            ) {
+
+                if (
+                    points.length > 1
+                ) {
+
+                    points.push({
+                        x: points[0].x,
+                        y: points[0].y
+                    });
+                }
+            }
+
+
+            if (
+                points.length > 1
+            ) {
+
+                strokes.push(
+                    points
+                );
+            }
         }
-
-        if (
-            el.tagName.toLowerCase() ===
-            "polygon" &&
-            points.length > 1
-        ) {
-
-            points.push({
-                ...points[0]
-            });
-        }
-
-        if (points.length > 1)
-            strokes.push(points);
-    });
+    );
 
 
     /*
-        LINE
+       LINES
     */
 
     doc.querySelectorAll(
         "line"
-    ).forEach(el => {
+    ).forEach(
+        element => {
 
-        const x1 =
-            Number(
-                el.getAttribute("x1") || 0
-            );
+            const x1 =
+                Number(
+                    element.getAttribute(
+                        "x1"
+                    ) || 0
+                );
 
-        const y1 =
-            Number(
-                el.getAttribute("y1") || 0
-            );
+            const y1 =
+                Number(
+                    element.getAttribute(
+                        "y1"
+                    ) || 0
+                );
 
-        const x2 =
-            Number(
-                el.getAttribute("x2") || 0
-            );
+            const x2 =
+                Number(
+                    element.getAttribute(
+                        "x2"
+                    ) || 0
+                );
 
-        const y2 =
-            Number(
-                el.getAttribute("y2") || 0
-            );
+            const y2 =
+                Number(
+                    element.getAttribute(
+                        "y2"
+                    ) || 0
+                );
 
-        strokes.push([
-            {
-                x: x1,
-                y: y1
-            },
-            {
-                x: x2,
-                y: y2
-            }
-        ]);
-    });
+
+            strokes.push([
+                {
+                    x: x1,
+                    y: y1
+                },
+                {
+                    x: x2,
+                    y: y2
+                }
+            ]);
+        }
+    );
 
 
     /*
-        RECT
+       RECTANGLES
     */
 
     doc.querySelectorAll(
         "rect"
-    ).forEach(el => {
+    ).forEach(
+        element => {
 
-        const x =
-            Number(
-                el.getAttribute("x") || 0
-            );
+            const x =
+                Number(
+                    element.getAttribute(
+                        "x"
+                    ) || 0
+                );
 
-        const y =
-            Number(
-                el.getAttribute("y") || 0
-            );
+            const y =
+                Number(
+                    element.getAttribute(
+                        "y"
+                    ) || 0
+                );
 
-        const w =
-            Number(
-                el.getAttribute("width") || 0
-            );
+            const w =
+                Number(
+                    element.getAttribute(
+                        "width"
+                    ) || 0
+                );
 
-        const h =
-            Number(
-                el.getAttribute("height") || 0
-            );
-
-        if (w <= 0 || h <= 0)
-            return;
-
-        strokes.push([
-            {x:x,     y:y},
-            {x:x+w,   y:y},
-            {x:x+w,   y:y+h},
-            {x:x,     y:y+h},
-            {x:x,     y:y}
-        ]);
-    });
+            const h =
+                Number(
+                    element.getAttribute(
+                        "height"
+                    ) || 0
+                );
 
 
-    /*
-        CIRCLE
-    */
-
-    doc.querySelectorAll(
-        "circle"
-    ).forEach(el => {
-
-        const cx =
-            Number(
-                el.getAttribute("cx") || 0
-            );
-
-        const cy =
-            Number(
-                el.getAttribute("cy") || 0
-            );
-
-        const r =
-            Number(
-                el.getAttribute("r") || 0
-            );
-
-        if (r <= 0)
-            return;
-
-        const points = [];
-
-        const samples = 80;
-
-        for (
-            let i = 0;
-            i <= samples;
-            i++
-        ) {
-
-            const a =
-                i /
-                samples *
-                Math.PI *
-                2;
-
-            points.push({
-                x:
-                    cx +
-                    Math.cos(a) * r,
-
-                y:
-                    cy +
-                    Math.sin(a) * r
-            });
-        }
-
-        strokes.push(points);
-    });
-
-
-    /*
-        ELLIPSE
-    */
-
-    doc.querySelectorAll(
-        "ellipse"
-    ).forEach(el => {
-
-        const cx =
-            Number(
-                el.getAttribute("cx") || 0
-            );
-
-        const cy =
-            Number(
-                el.getAttribute("cy") || 0
-            );
-
-        const rx =
-            Number(
-                el.getAttribute("rx") || 0
-            );
-
-        const ry =
-            Number(
-                el.getAttribute("ry") || 0
+            if (
+                w <= 0 ||
+                h <= 0
             )
+                return;
+
+
+            strokes.push([
+                {x:x,     y:y},
+                {x:x+w,   y:y},
+                {x:x+w,   y:y+h},
+                {x:x,  
