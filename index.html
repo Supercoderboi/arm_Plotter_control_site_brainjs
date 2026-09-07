@@ -12,7 +12,6 @@
 <title>SCARA Wireless Plotter</title>
 
 <style>
-
 * {
     box-sizing: border-box;
 }
@@ -22,12 +21,7 @@ body {
     padding: 15px;
     background: #121212;
     color: #eeeeee;
-    font-family:
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Arial,
-        sans-serif;
+    font-family: Arial, sans-serif;
 }
 
 h1 {
@@ -51,20 +45,20 @@ button {
     width: 100%;
     border: none;
     border-radius: 8px;
-    padding: 12px;
+    padding: 13px;
     margin: 5px 0;
-    background: #333333;
+    background: #333;
     color: white;
     font-size: 15px;
     cursor: pointer;
 }
 
 button:active {
-    transform: scale(0.98);
+    transform: scale(.98);
 }
 
 button:disabled {
-    opacity: 0.4;
+    opacity: .4;
 }
 
 .connect {
@@ -79,13 +73,9 @@ button:disabled {
     background: #a52828;
 }
 
-.orange {
-    background: #9a6500;
-}
-
 .row {
     display: flex;
-    gap: 7px;
+    gap: 8px;
 }
 
 .row button {
@@ -122,9 +112,9 @@ input[type="file"] {
 }
 
 .hint {
-    color: #aaaaaa;
+    color: #aaa;
     font-size: 13px;
-    line-height: 1.45;
+    line-height: 1.5;
     margin-top: 10px;
 }
 
@@ -134,10 +124,6 @@ input[type="file"] {
     border: 1px solid #444;
     border-radius: 10px;
     overflow: hidden;
-
-    /*
-       VERY IMPORTANT FOR PHONE TOUCH DRAGGING
-    */
     touch-action: none;
 }
 
@@ -145,7 +131,6 @@ input[type="file"] {
     display: block;
     width: 100%;
     height: auto;
-
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
@@ -155,9 +140,8 @@ input[type="file"] {
     background: #080808;
     border-radius: 8px;
     padding: 10px;
-    height: 160px;
+    height: 180px;
     overflow-y: auto;
-
     white-space: pre-wrap;
     font-family: monospace;
     font-size: 12px;
@@ -171,41 +155,42 @@ input[type="file"] {
     color: #ef5350;
 }
 
+.info {
+    color: #64b5f6;
+}
 </style>
 </head>
-
 
 <body>
 
 <h1>🤖 SCARA Wireless Plotter</h1>
 
-
-<!-- =========================================================
+<!-- =====================================================
      BLUETOOTH
-========================================================= -->
+===================================================== -->
 
 <div class="card">
 
 <h2>📡 Bluetooth</h2>
 
-<button
-    id="connectBtn"
-    class="connect">
-    Connect to SCARA
+<button id="connectBtn" class="connect">
+    🔵 Connect to SCARA
 </button>
 
-<div
-    id="bleStatus"
-    class="status">
+<button id="disconnectBtn" disabled>
+    Disconnect
+</button>
+
+<div id="bleStatus" class="status">
     Not connected
 </div>
 
 </div>
 
 
-<!-- =========================================================
-     ARM INFORMATION
-========================================================= -->
+<!-- =====================================================
+     ARM
+===================================================== -->
 
 <div class="card">
 
@@ -236,9 +221,9 @@ Minimum radius:
 </div>
 
 
-<!-- =========================================================
-     MANUAL CONTROL
-========================================================= -->
+<!-- =====================================================
+     MANUAL
+===================================================== -->
 
 <div class="card">
 
@@ -246,11 +231,7 @@ Minimum radius:
 
 <label>
 Base
-<span
-    id="baseValue"
-    class="value">
-    90°
-</span>
+<span id="baseValue" class="value">90°</span>
 </label>
 
 <input
@@ -260,14 +241,9 @@ Base
     max="180"
     value="90">
 
-
 <label>
 Joint
-<span
-    id="jointValue"
-    class="value">
-    90°
-</span>
+<span id="jointValue" class="value">90°</span>
 </label>
 
 <input
@@ -277,11 +253,9 @@ Joint
     max="180"
     value="90">
 
-
 <button id="moveManualBtn">
     Move
 </button>
-
 
 <div class="row">
 
@@ -298,9 +272,9 @@ Joint
 </div>
 
 
-<!-- =========================================================
+<!-- =====================================================
      SVG
-========================================================= -->
+===================================================== -->
 
 <div class="card">
 
@@ -311,14 +285,11 @@ Joint
     type="file"
     accept=".svg,image/svg+xml">
 
-
 <label>
-    Scale
-    <span
-        id="scaleValue"
-        class="value">
-        1.00×
-    </span>
+Scale
+<span id="scaleValue" class="value">
+    1.00×
+</span>
 </label>
 
 <input
@@ -328,7 +299,6 @@ Joint
     max="3"
     step="0.05"
     value="1">
-
 
 <div class="row">
 
@@ -342,77 +312,60 @@ Joint
 
 </div>
 
-
 <div class="hint">
 
-👆 <b>Drag the drawing directly</b> on the grid.
+👆 Drag the drawing directly on the grid.
 
 <br>
 
-📱 Works with touch.
+📱 Touch dragging supported.
 
 <br>
 
-📐 The grid is in millimetres.
+📐 Grid = millimetres.
 
 <br>
 
-🎯 The SCARA base is at <b>(0,0)</b>.
+🎯 SCARA base = <b>(0,0)</b>.
 
 </div>
 
 </div>
 
 
-<!-- =========================================================
-     WORKSPACE
-========================================================= -->
+<!-- =====================================================
+     PREVIEW
+===================================================== -->
 
 <div class="card">
 
 <h2>📐 SCARA Workspace</h2>
 
 <div id="previewWrapper">
-
-<canvas id="preview"></canvas>
-
+    <canvas id="preview"></canvas>
 </div>
 
-
-<div
-    id="workspaceStatus"
-    class="status">
-
-No SVG loaded.
-
+<div id="workspaceStatus" class="status">
+    No SVG loaded.
 </div>
 
 </div>
 
 
-<!-- =========================================================
+<!-- =====================================================
      PLOT
-========================================================= -->
+===================================================== -->
 
 <div class="card">
 
 <h2>🖊️ Plot</h2>
 
-
 <label>
-
 Point delay
-
-<span
-    id="delayValue"
-    class="value">
-
-20 ms
-
+<span id="delayValue" class="value">
+    20 ms
 </span>
-
 </label>
-
 
 <input
     id="delaySlider"
@@ -421,7 +374,6 @@ Point delay
     max="200"
     step="5"
     value="20">
-
 
 <button
     id="startBtn"
@@ -432,7 +384,6 @@ Point delay
 
 </button>
 
-
 <button
     id="abortBtn"
     class="red"
@@ -442,21 +393,16 @@ Point delay
 
 </button>
 
-
-<div
-    id="progress"
-    class="status">
-
-Ready
-
+<div id="progress" class="status">
+    Ready
 </div>
 
 </div>
 
 
-<!-- =========================================================
+<!-- =====================================================
      DEBUG
-========================================================= -->
+===================================================== -->
 
 <div class="card">
 
@@ -467,28 +413,20 @@ Ready
 </div>
 
 
-
 <script>
 
-/* =========================================================
+/* =====================================================
    CONFIG
-========================================================= */
+===================================================== */
 
 const L1 = 120;
 const L2 = 220;
-
-
-/*
-   YOUR CURRENT CALIBRATION
-*/
 
 const BASE_OFF = 65;
 const JOINT_OFF = 175;
 
 
-/*
-   BLE UUIDs
-*/
+/* BLE */
 
 const SERVICE_UUID =
     "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -496,12 +434,16 @@ const SERVICE_UUID =
 const RX_UUID =
     "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
+const DEVICE_NAME =
+    "SCARA_Plotter";
 
-/* =========================================================
+
+/* =====================================================
    STATE
-========================================================= */
+===================================================== */
 
 let device = null;
+let server = null;
 let characteristic = null;
 
 let currentBase = 90;
@@ -511,7 +453,6 @@ let penState = 0;
 
 let svgLoaded = false;
 
-let originalStrokes = [];
 let svgStrokes = [];
 
 let svgOffsetX = 0;
@@ -523,9 +464,9 @@ let plotting = false;
 let abortPlot = false;
 
 
-/* =========================================================
-   CANVAS
-========================================================= */
+/* =====================================================
+   ELEMENTS
+===================================================== */
 
 const canvas =
     document.getElementById("preview");
@@ -537,25 +478,14 @@ const wrapper =
     document.getElementById("previewWrapper");
 
 
-const VIEW_MM = 380;
-
-let canvasWidth = 350;
-let canvasHeight = 350;
-
-let pixelsPerMM = 0.45;
-
-
-/* =========================================================
-   SAFE LOG
-========================================================= */
+/* =====================================================
+   LOG
+===================================================== */
 
 function log(text) {
 
     const box =
         document.getElementById("log");
-
-    if (!box)
-        return;
 
     const time =
         new Date().toLocaleTimeString();
@@ -570,17 +500,13 @@ function log(text) {
 }
 
 
-/* =========================================================
-   GLOBAL ERROR HANDLER
-========================================================= */
-
 window.addEventListener(
     "error",
-    function(event) {
+    function(e) {
 
         log(
-            "JAVASCRIPT ERROR: " +
-            event.message
+            "JS ERROR: " +
+            e.message
         );
     }
 );
@@ -588,19 +514,26 @@ window.addEventListener(
 
 window.addEventListener(
     "unhandledrejection",
-    function(event) {
+    function(e) {
 
         log(
             "PROMISE ERROR: " +
-            event.reason
+            e.reason
         );
     }
 );
 
 
-/* =========================================================
-   CANVAS RESIZE
-========================================================= */
+/* =====================================================
+   CANVAS
+===================================================== */
+
+const VIEW_MM = 380;
+
+let canvasWidth = 350;
+let canvasHeight = 350;
+let pixelsPerMM = 0.45;
+
 
 function resizeCanvas() {
 
@@ -610,28 +543,20 @@ function resizeCanvas() {
     const dpr =
         window.devicePixelRatio || 1;
 
-
     canvasWidth = width;
     canvasHeight = width;
 
-
     canvas.width =
-        Math.round(
-            width * dpr
-        );
+        Math.round(width * dpr);
 
     canvas.height =
-        Math.round(
-            width * dpr
-        );
-
+        Math.round(width * dpr);
 
     canvas.style.width =
         width + "px";
 
     canvas.style.height =
         width + "px";
-
 
     ctx.setTransform(
         dpr,
@@ -642,11 +567,8 @@ function resizeCanvas() {
         0
     );
 
-
     pixelsPerMM =
-        width /
-        (VIEW_MM * 2);
-
+        width / (VIEW_MM * 2);
 
     drawPreview();
 }
@@ -658,9 +580,9 @@ window.addEventListener(
 );
 
 
-/* =========================================================
-   COORDINATE SYSTEM
-========================================================= */
+/* =====================================================
+   COORDINATES
+===================================================== */
 
 function mmToCanvas(x, y) {
 
@@ -673,30 +595,30 @@ function mmToCanvas(x, y) {
         y:
             canvasHeight / 2 -
             y * pixelsPerMM
+
     };
 }
 
 
-function canvasToMM(px, py) {
+function canvasToMM(x, y) {
 
     return {
 
         x:
-            (px -
-             canvasWidth / 2) /
+            (x - canvasWidth / 2) /
             pixelsPerMM,
 
         y:
-            (canvasHeight / 2 -
-             py) /
+            (canvasHeight / 2 - y) /
             pixelsPerMM
+
     };
 }
 
 
-/* =========================================================
-   DRAW GRID
-========================================================= */
+/* =====================================================
+   GRID
+===================================================== */
 
 function drawGrid() {
 
@@ -707,9 +629,7 @@ function drawGrid() {
         canvasHeight
     );
 
-
-    ctx.fillStyle =
-        "#090909";
+    ctx.fillStyle = "#080808";
 
     ctx.fillRect(
         0,
@@ -719,9 +639,7 @@ function drawGrid() {
     );
 
 
-    /*
-       GRID
-    */
+    /* GRID */
 
     for (
         let mm = -VIEW_MM;
@@ -729,30 +647,25 @@ function drawGrid() {
         mm += 20
     ) {
 
-        const vertical =
-            mmToCanvas(
-                mm,
-                0
-            );
-
+        const p =
+            mmToCanvas(mm, 0);
 
         ctx.beginPath();
 
         ctx.moveTo(
-            vertical.x,
+            p.x,
             0
         );
 
         ctx.lineTo(
-            vertical.x,
+            p.x,
             canvasHeight
         );
 
-
         ctx.strokeStyle =
             mm % 100 === 0
-                ? "#333333"
-                : "#1d1d1d";
+                ? "#333"
+                : "#1c1c1c";
 
         ctx.lineWidth =
             mm % 100 === 0
@@ -762,43 +675,32 @@ function drawGrid() {
         ctx.stroke();
 
 
-        const horizontal =
-            mmToCanvas(
-                0,
-                mm
-            );
-
+        const q =
+            mmToCanvas(0, mm);
 
         ctx.beginPath();
 
         ctx.moveTo(
             0,
-            horizontal.y
+            q.y
         );
 
         ctx.lineTo(
             canvasWidth,
-            horizontal.y
+            q.y
         );
 
         ctx.stroke();
     }
 
 
-    /*
-       ORIGIN
-    */
+    /* ORIGIN */
 
     const origin =
-        mmToCanvas(
-            0,
-            0
-        );
+        mmToCanvas(0, 0);
 
 
-    /*
-       X AXIS
-    */
+    /* X AXIS */
 
     ctx.beginPath();
 
@@ -813,16 +715,14 @@ function drawGrid() {
     );
 
     ctx.strokeStyle =
-        "#888888";
+        "#888";
 
     ctx.lineWidth = 1.5;
 
     ctx.stroke();
 
 
-    /*
-       Y AXIS
-    */
+    /* Y AXIS */
 
     ctx.beginPath();
 
@@ -839,43 +739,37 @@ function drawGrid() {
     ctx.stroke();
 
 
-    /*
-       MAXIMUM REACH
-       340mm
-    */
+    /* OUTER REACH */
 
     ctx.beginPath();
 
     ctx.arc(
         origin.x,
         origin.y,
-        340 * pixelsPerMM,
+        L1 + L2 > 0
+            ? (L1 + L2) * pixelsPerMM
+            : 0,
         0,
         Math.PI * 2
     );
 
-    ctx.setLineDash([
-        7,
-        5
-    ]);
+    ctx.setLineDash([7,5]);
 
     ctx.strokeStyle =
-        "#62a66b";
+        "#65a86b";
 
     ctx.stroke();
 
 
-    /*
-       INNER UNREACHABLE
-       100mm
-    */
+    /* INNER HOLE */
 
     ctx.beginPath();
 
     ctx.arc(
         origin.x,
         origin.y,
-        100 * pixelsPerMM,
+        Math.abs(L2 - L1) *
+        pixelsPerMM,
         0,
         Math.PI * 2
     );
@@ -885,13 +779,10 @@ function drawGrid() {
 
     ctx.stroke();
 
-
     ctx.setLineDash([]);
 
 
-    /*
-       ORIGIN DOT
-    */
+    /* ORIGIN DOT */
 
     ctx.beginPath();
 
@@ -904,21 +795,18 @@ function drawGrid() {
     );
 
     ctx.fillStyle =
-        "#ffffff";
+        "#fff";
 
     ctx.fill();
 
 
-    /*
-       LABELS
-    */
+    /* LABELS */
 
     ctx.font =
         "12px Arial";
 
     ctx.fillStyle =
-        "#bbbbbb";
-
+        "#bbb";
 
     ctx.fillText(
         "(0,0)",
@@ -926,56 +814,17 @@ function drawGrid() {
         origin.y - 8
     );
 
-
     ctx.fillText(
         "X",
-        canvasWidth - 16,
+        canvasWidth - 18,
         origin.y - 8
     );
-
 
     ctx.fillText(
         "Y",
         origin.x + 8,
         15
     );
-
-
-    /*
-       DISTANCE LABELS
-    */
-
-    for (
-        let mm = 100;
-        mm <= 300;
-        mm += 100
-    ) {
-
-        const px =
-            mmToCanvas(
-                mm,
-                0
-            );
-
-        ctx.fillText(
-            mm,
-            px.x - 10,
-            origin.y + 15
-        );
-
-
-        const py =
-            mmToCanvas(
-                0,
-                mm
-            );
-
-        ctx.fillText(
-            mm,
-            origin.x + 8,
-            py.y + 4
-        );
-    }
 
 
     ctx.fillStyle =
@@ -998,29 +847,26 @@ function drawGrid() {
         origin.x +
         100 * pixelsPerMM -
         25,
-        origin.y + 24
+        origin.y + 22
     );
 }
 
 
-/* =========================================================
+/* =====================================================
    DRAW SVG
-========================================================= */
+===================================================== */
 
 function drawSVG() {
 
     if (!svgLoaded)
         return;
 
-
     ctx.save();
-
 
     ctx.strokeStyle =
         "#ffffff";
 
-    ctx.lineWidth =
-        1.7;
+    ctx.lineWidth = 1.7;
 
     ctx.lineJoin =
         "round";
@@ -1033,14 +879,10 @@ function drawSVG() {
         const stroke of svgStrokes
     ) {
 
-        if (
-            stroke.length < 2
-        )
+        if (stroke.length < 2)
             continue;
 
-
         ctx.beginPath();
-
 
         for (
             let i = 0;
@@ -1048,28 +890,19 @@ function drawSVG() {
             i++
         ) {
 
-            const point =
+            const p =
                 stroke[i];
-
 
             const x =
                 svgOffsetX +
-                point.x *
-                svgScale;
-
+                p.x * svgScale;
 
             const y =
                 svgOffsetY +
-                point.y *
-                svgScale;
-
+                p.y * svgScale;
 
             const screen =
-                mmToCanvas(
-                    x,
-                    y
-                );
-
+                mmToCanvas(x, y);
 
             if (i === 0) {
 
@@ -1087,39 +920,30 @@ function drawSVG() {
             }
         }
 
-
         ctx.stroke();
     }
-
 
     ctx.restore();
 }
 
 
-/* =========================================================
-   PREVIEW
-========================================================= */
-
 function drawPreview() {
 
     drawGrid();
-
     drawSVG();
 }
 
 
-/* =========================================================
+/* =====================================================
    SVG PARSER
-========================================================= */
+===================================================== */
 
 function parseSVG(text) {
 
     log("Parsing SVG...");
 
-
     const parser =
         new DOMParser();
-
 
     const doc =
         parser.parseFromString(
@@ -1127,22 +951,13 @@ function parseSVG(text) {
             "image/svg+xml"
         );
 
+    if (
+        doc.querySelector("parsererror")
+    ) {
 
-    const parserError =
-        doc.querySelector(
-            "parsererror"
-        );
+        alert("Invalid SVG.");
 
-
-    if (parserError) {
-
-        alert(
-            "Invalid SVG file."
-        );
-
-        log(
-            "SVG parser error."
-        );
+        log("SVG parser error.");
 
         return;
     }
@@ -1151,23 +966,56 @@ function parseSVG(text) {
     const strokes = [];
 
 
-    /*
-       PATH
-    */
+    /* PATH */
 
-    const paths =
-        doc.querySelectorAll(
-            "path"
-        );
-
-
-    paths.forEach(
-        path => {
+    doc.querySelectorAll("path")
+        .forEach(path => {
 
             try {
 
+                /*
+                   Import the SVG into a
+                   temporary visible SVG.
+
+                   This makes getTotalLength()
+                   much more reliable on browsers.
+                */
+
+                const temp =
+                    document.createElementNS(
+                        "http://www.w3.org/2000/svg",
+                        "svg"
+                    );
+
+                temp.style.position =
+                    "absolute";
+
+                temp.style.left =
+                    "-10000px";
+
+                temp.style.top =
+                    "-10000px";
+
+                temp.style.width =
+                    "1px";
+
+                temp.style.height =
+                    "1px";
+
+                document.body.appendChild(temp);
+
+
+                const copy =
+                    document.importNode(
+                        path,
+                        true
+                    );
+
+                temp.appendChild(copy);
+
+
                 const length =
-                    path.getTotalLength();
+                    copy.getTotalLength();
 
 
                 const points = [];
@@ -1189,18 +1037,22 @@ function parseSVG(text) {
                 ) {
 
                     const p =
-                        path.getPointAtLength(
+                        copy.getPointAtLength(
                             length *
                             i /
                             samples
                         );
 
-
                     points.push({
+
                         x: p.x,
                         y: p.y
+
                     });
                 }
+
+
+                temp.remove();
 
 
                 if (
@@ -1212,177 +1064,151 @@ function parseSVG(text) {
                     );
                 }
 
-            } catch (error) {
+            } catch(e) {
 
                 log(
-                    "Could not read PATH."
+                    "Could not parse path."
                 );
             }
-        }
-    );
+
+        });
 
 
-    /*
-       POLYLINE / POLYGON
-    */
+    /* POLYLINE + POLYGON */
 
     doc.querySelectorAll(
         "polyline, polygon"
-    ).forEach(
-        element => {
+    ).forEach(element => {
 
-            const raw =
-                element.getAttribute(
-                    "points"
-                );
+        const raw =
+            element.getAttribute(
+                "points"
+            );
 
-
-            if (!raw)
-                return;
+        if (!raw)
+            return;
 
 
-            const numbers =
-                raw
-                    .trim()
-                    .split(
-                        /[\s,]+/
-                    )
-                    .map(Number);
+        const nums =
+            raw.trim()
+               .split(/[\s,]+/)
+               .map(Number);
 
 
-            const points = [];
+        const points = [];
 
 
-            for (
-                let i = 0;
-                i + 1 < numbers.length;
-                i += 2
-            ) {
-
-                points.push({
-                    x: numbers[i],
-                    y: numbers[i + 1]
-                });
-            }
-
+        for (
+            let i = 0;
+            i + 1 < nums.length;
+            i += 2
+        ) {
 
             if (
-                element.tagName
-                    .toLowerCase() ===
-                "polygon"
-            ) {
-
-                if (
-                    points.length > 1
-                ) {
-
-                    points.push({
-                        x: points[0].x,
-                        y: points[0].y
-                    });
-                }
-            }
+                !Number.isFinite(
+                    nums[i]
+                ) ||
+                !Number.isFinite(
+                    nums[i + 1]
+                )
+            )
+                continue;
 
 
-            if (
-                points.length > 1
-            ) {
+            points.push({
 
-                strokes.push(
-                    points
-                );
-            }
+                x: nums[i],
+                y: nums[i + 1]
+
+            });
         }
-    );
 
 
-    /*
-       LINES
-    */
+        if (
+            element.tagName.toLowerCase() ===
+            "polygon" &&
+            points.length > 1
+        ) {
 
-    doc.querySelectorAll(
-        "line"
-    ).forEach(
-        element => {
+            points.push({
+                x: points[0].x,
+                y: points[0].y
+            });
+        }
+
+
+        if (points.length > 1)
+            strokes.push(points);
+
+    });
+
+
+    /* LINE */
+
+    doc.querySelectorAll("line")
+        .forEach(element => {
 
             const x1 =
                 Number(
-                    element.getAttribute(
-                        "x1"
-                    ) || 0
+                    element.getAttribute("x1") || 0
                 );
 
             const y1 =
                 Number(
-                    element.getAttribute(
-                        "y1"
-                    ) || 0
+                    element.getAttribute("y1") || 0
                 );
 
             const x2 =
                 Number(
-                    element.getAttribute(
-                        "x2"
-                    ) || 0
+                    element.getAttribute("x2") || 0
                 );
 
             const y2 =
                 Number(
-                    element.getAttribute(
-                        "y2"
-                    ) || 0
+                    element.getAttribute("y2") || 0
                 );
 
 
             strokes.push([
+
                 {
                     x: x1,
                     y: y1
                 },
+
                 {
                     x: x2,
                     y: y2
                 }
+
             ]);
-        }
-    );
+
+        });
 
 
-    /*
-       RECTANGLES
-    */
+    /* RECT */
 
-    doc.querySelectorAll(
-        "rect"
-    ).forEach(
-        element => {
+    doc.querySelectorAll("rect")
+        .forEach(element => {
 
             const x =
                 Number(
-                    element.getAttribute(
-                        "x"
-                    ) || 0
+                    element.getAttribute("x") || 0
                 );
 
             const y =
                 Number(
-                    element.getAttribute(
-                        "y"
-                    ) || 0
+                    element.getAttribute("y") || 0
                 );
 
             const w =
                 Number(
-                    element.getAttribute(
-                        "width"
-                    ) || 0
+                    element.getAttribute("width") || 0
                 );
 
             const h =
                 Number(
-                    element.getAttribute(
-                        "height"
-                    ) || 0
+                    element.getAttribute("height") || 0
                 );
 
 
@@ -1394,7 +1220,94 @@ function parseSVG(text) {
 
 
             strokes.push([
-                {x:x,     y:y},
-                {x:x+w,   y:y},
-                {x:x+w,   y:y+h},
-                {x:x,  
+
+                {x:x,   y:y},
+                {x:x+w, y:y},
+                {x:x+w, y:y+h},
+                {x:x,   y:y+h},
+                {x:x,   y:y}
+
+            ]);
+
+        });
+
+
+    /* CIRCLE */
+
+    doc.querySelectorAll("circle")
+        .forEach(element => {
+
+            const cx =
+                Number(
+                    element.getAttribute("cx") || 0
+                );
+
+            const cy =
+                Number(
+                    element.getAttribute("cy") || 0
+                );
+
+            const r =
+                Number(
+                    element.getAttribute("r") || 0
+                );
+
+
+            if (r <= 0)
+                return;
+
+
+            const points = [];
+
+
+            for (
+                let i = 0;
+                i <= 80;
+                i++
+            ) {
+
+                const a =
+                    i /
+                    80 *
+                    Math.PI *
+                    2;
+
+
+                points.push({
+
+                    x:
+                        cx +
+                        Math.cos(a) * r,
+
+                    y:
+                        cy +
+                        Math.sin(a) * r
+
+                });
+            }
+
+
+            strokes.push(points);
+
+        });
+
+
+    /* ELLIPSE */
+
+    doc.querySelectorAll("ellipse")
+        .forEach(element => {
+
+            const cx =
+                Number(
+                    element.getAttribute("cx") || 0
+                );
+
+            const cy =
+                Number(
+                    element.getAttribute("cy") || 0
+                );
+
+            const rx =
+                Number(
+                    element.getAttribute("rx") || 0
+       
