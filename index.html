@@ -4,320 +4,1075 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SCARA Wireless Controller - IK Version</title>
+
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; background: #121212; color: #fff; }
-       .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-        button { background: #007aff; color: #fff; border: none; padding: 12px 20px; font-size: 16px; border-radius: 8px; width: 100%; margin: 5px 0; cursor: pointer; }
-        button:disabled { background: #444; }
-       .btn-green { background: #34c759; }
-       .btn-red { background: #ff3b30; }
-       .btn-secondary { background: #5856d6; }
-        input[type="number"], input[type="text"] { width: calc(100% - 22px); padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #333; background: #2c2c2c; color: #fff; font-size: 16px; }
-       .row { display: flex; gap: 10px; }
-       .status { font-weight: bold; color: #ff3b30; }
-       .connected { color: #34c759; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #333; padding: 8px; text-align: center; }
-        th { background: #2a2a2a; }
-        td input { width: 90%; padding: 4px; margin: 0; }
-       .prediction-box { background: #2a2a2a; border-left: 4px solid #007aff; padding: 10px; margin-top: 10px; border-radius: 4px; }
-        canvas { background: #000; border-radius: 8px; width: 100%; height: auto; margin-top: 10px; border: 1px solid #333; }
-       .progress-bar { background: #333; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 10px; }
-       .progress-fill { background: #34c759; height: 100%; width: 0%; transition: width 0.1s; }
-       .setting-label { font-size: 13px; color: #aaa; margin-top: 6px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 15px;
+            background: #121212;
+            color: #fff;
+        }
+
+        .card {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: #007aff;
+            color: #fff;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            width: 100%;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background: #444;
+        }
+
+        .btn-green {
+            background: #34c759;
+        }
+
+        .btn-red {
+            background: #ff3b30;
+        }
+
+        .btn-secondary {
+            background: #5856d6;
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #2c2c2c;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .status {
+            font-weight: bold;
+            color: #ff3b30;
+        }
+
+        .connected {
+            color: #34c759;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: center;
+        }
+
+        th {
+            background: #2a2a2a;
+        }
+
+        td input {
+            width: 90%;
+            padding: 4px;
+            margin: 0;
+        }
+
+        .prediction-box {
+            background: #2a2a2a;
+            border-left: 4px solid #007aff;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+
+        canvas {
+            background: #000;
+            border-radius: 8px;
+            width: 100%;
+            height: auto;
+            margin-top: 10px;
+            border: 1px solid #333;
+        }
+
+        .progress-bar {
+            background: #333;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            background: #34c759;
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        .setting-label {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 6px;
+        }
+
+        .value-label {
+            font-size: 14px;
+            color: #ddd;
+        }
     </style>
 </head>
+
 <body>
 
     <h2>SCARA Wireless Plotter - IK Math (No NN)</h2>
 
-    <div class="card">
-        <div>Status: <span id="bleStatus" class="status">Disconnected</span></div>
-        <button id="connectBtn" onclick="connectBLE()">Connect Bluetooth</button>
-    </div>
+    <!-- ============================= -->
+    <!-- BLUETOOTH -->
+    <!-- ============================= -->
 
     <div class="card">
-        <h3>IK Settings (Tune these)</h3>
-        <div class="row">
-            <div style="flex:1">L1 <input type="number" id="L1" value="120"></div>
-            <div style="flex:1">L2 <input type="number" id="L2" value="205"></div>
+
+        <div>
+            Status:
+            <span id="bleStatus" class="status">
+                Disconnected
+            </span>
         </div>
-        <div class="row">
-            <div style="flex:1">Base Off <input type="number" id="baseOff" value="65"></div>
-            <div style="flex:1">Joint Off <input type="number" id="jointOff" value="175"></div>
-        </div>
-        <div class="setting-label">When you set 90,90 what X,Y do you get? Adjust Offsets until 120,205.</div>
+
+        <button id="connectBtn" onclick="connectBLE()">
+            Connect Bluetooth
+        </button>
+
     </div>
 
+
+    <!-- ============================= -->
+    <!-- IK SETTINGS -->
+    <!-- ============================= -->
+
     <div class="card">
+
+        <h3>IK Settings</h3>
+
+        <div class="row">
+
+            <div style="flex:1">
+                L1
+                <input
+                    type="number"
+                    id="L1"
+                    value="120"
+                    min="1"
+                    step="0.1"
+                >
+            </div>
+
+            <div style="flex:1">
+                L2
+                <input
+                    type="number"
+                    id="L2"
+                    value="220"
+                    min="1"
+                    step="0.1"
+                >
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div style="flex:1">
+                Base Off
+                <input
+                    type="number"
+                    id="baseOff"
+                    value="65"
+                    step="0.1"
+                >
+            </div>
+
+            <div style="flex:1">
+                Joint Off
+                <input
+                    type="number"
+                    id="jointOff"
+                    value="175"
+                    step="0.1"
+                >
+            </div>
+
+        </div>
+
+        <div class="setting-label">
+            L1 and L2 are your physical arm lengths.
+            Offsets compensate for your servo mounting/calibration.
+        </div>
+
+    </div>
+
+
+    <!-- ============================= -->
+    <!-- MANUAL SERVO CONTROL -->
+    <!-- ============================= -->
+
+    <div class="card">
+
         <h3>Manual Servo Control</h3>
-        <label>Base Angle (0-180): <span id="baseVal">90</span>°</label>
-        <input type="range" id="baseSlider" min="0" max="180" value="90" style="width: 100%;" oninput="handleSliderInput()">
-        <label>Joint Angle (20-180): <span id="jointVal">90</span>°</label>
-        <input type="range" id="jointSlider" min="20" max="180" value="90" style="width: 100%;" oninput="handleSliderInput()">
+
+        <label>
+            Base Angle (0-180):
+            <span id="baseVal">90</span>°
+        </label>
+
+        <input
+            type="range"
+            id="baseSlider"
+            min="0"
+            max="180"
+            value="90"
+            step="1"
+            oninput="handleSliderInput()"
+        >
+
+        <label>
+            Joint Angle (20-180):
+            <span id="jointVal">90</span>°
+        </label>
+
+        <input
+            type="range"
+            id="jointSlider"
+            min="20"
+            max="180"
+            value="90"
+            step="1"
+            oninput="handleSliderInput()"
+        >
+
         <div class="row">
-            <button onclick="togglePen(1)">Pen DOWN</button>
-            <button onclick="togglePen(0)">Pen UP</button>
+
+            <button onclick="togglePen(1)">
+                Pen DOWN
+            </button>
+
+            <button onclick="togglePen(0)">
+                Pen UP
+            </button>
+
         </div>
+
     </div>
 
+
+    <!-- ============================= -->
+    <!-- CARTESIAN IK -->
+    <!-- ============================= -->
+
     <div class="card">
+
         <h3>Move to Target Cartesian (X, Y)</h3>
+
         <div class="row">
-            <input type="number" id="targetX" placeholder="Target X (mm)" value="100">
-            <input type="number" id="targetY" placeholder="Target Y (mm)" value="100">
+
+            <input
+                type="number"
+                id="targetX"
+                placeholder="Target X (mm)"
+                value="100"
+                step="1"
+            >
+
+            <input
+                type="number"
+                id="targetY"
+                placeholder="Target Y (mm)"
+                value="100"
+                step="1"
+            >
+
         </div>
-        <button onclick="moveToTarget()" class="btn-green">Move via IK (Smooth)</button>
-        <div id="predictionDisplay" class="prediction-box" style="display: none;">
-            <strong>Target:</strong> X: <span id="outX">0</span> mm, Y: <span id="outY">0</span> mm<br>
-            <strong>IK Angles:</strong> Base: <span id="outBase">0</span>°, Joint: <span id="outJoint">0</span>°
+
+        <button
+            onclick="moveToTarget()"
+            class="btn-green"
+        >
+            Move via IK (Smooth)
+        </button>
+
+        <div
+            id="predictionDisplay"
+            class="prediction-box"
+            style="display:none;"
+        >
+
+            <strong>Target:</strong>
+            X:
+            <span id="outX">0</span>
+            mm,
+            Y:
+            <span id="outY">0</span>
+            mm
+
+            <br>
+
+            <strong>IK Angles:</strong>
+            Base:
+            <span id="outBase">0</span>°,
+            Joint:
+            <span id="outJoint">0</span>°
+
         </div>
+
     </div>
 
+
+    <!-- ============================= -->
+    <!-- SVG PLOTTER -->
+    <!-- ============================= -->
+
     <div class="card">
+
         <h3>SVG Plotter Engine</h3>
-        <button onclick="document.getElementById('svgFileInput').click()" class="btn-secondary">Load SVG File</button>
-        <input type="file" id="svgFileInput" accept=".svg" style="display:none;" onchange="handleSVGUpload(event)">
-        <div class="setting-label">Delay per 0.3° step (ms) - higher = less buck current</div>
-        <input type="number" id="lerpDelayInput" value="40" min="10" max="100">
-        <label style="font-size:14px"><input type="checkbox" id="lowPowerCheck" checked> Low-Power Mode (move one servo at a time)</label>
-        <div class="row" style="margin-top: 10px;">
-            <button id="startPlotBtn" onclick="startPlotting()" class="btn-green" disabled>Start Smooth Plot</button>
-            <button id="stopPlotBtn" onclick="stopPlotting()" class="btn-red" disabled>Abort Plot</button>
+
+        <button
+            onclick="document.getElementById('svgFileInput').click()"
+            class="btn-secondary"
+        >
+            Load SVG File
+        </button>
+
+        <input
+            type="file"
+            id="svgFileInput"
+            accept=".svg"
+            style="display:none;"
+            onchange="handleSVGUpload(event)"
+        >
+
+
+        <!-- SVG POSITION -->
+
+        <h4>SVG Position & Size</h4>
+
+        <div class="row">
+
+            <div style="flex:1">
+
+                <div class="setting-label">
+                    X Position (mm)
+                </div>
+
+                <input
+                    type="number"
+                    id="svgX"
+                    value="60"
+                    step="1"
+                    oninput="updateSVGTransform()"
+                >
+
+            </div>
+
+
+            <div style="flex:1">
+
+                <div class="setting-label">
+                    Y Position (mm)
+                </div>
+
+                <input
+                    type="number"
+                    id="svgY"
+                    value="60"
+                    step="1"
+                    oninput="updateSVGTransform()"
+                >
+
+            </div>
+
         </div>
-        <div class="progress-bar"><div id="plotProgress" class="progress-fill"></div></div>
-        <div id="plotStatusText" style="margin-top: 5px; font-size: 14px;">No SVG Loaded</div>
-        <canvas id="previewCanvas" width="300" height="300"></canvas>
+
+
+        <!-- SVG SCALE -->
+
+        <div class="setting-label">
+            Size / Scale
+        </div>
+
+        <input
+            type="number"
+            id="svgScale"
+            value="1.0"
+            min="0.05"
+            max="5"
+            step="0.05"
+            oninput="updateSVGTransform()"
+        >
+
+        <div class="setting-label">
+            1.0 = current size,
+            2.0 = twice as large,
+            0.5 = half size
+        </div>
+
+
+        <button
+            onclick="centerSVG()"
+            class="btn-secondary"
+        >
+            Center SVG
+        </button>
+
+
+        <!-- DELAY -->
+
+        <div class="setting-label">
+            Delay per step (ms)
+        </div>
+
+        <input
+            type="number"
+            id="lerpDelayInput"
+            value="40"
+            min="10"
+            max="100"
+        >
+
+
+        <!-- LOW POWER -->
+
+        <label style="font-size:14px">
+
+            <input
+                type="checkbox"
+                id="lowPowerCheck"
+                checked
+            >
+
+            Low-Power Mode
+            (move one servo at a time)
+
+        </label>
+
+
+        <!-- PLOT BUTTONS -->
+
+        <div
+            class="row"
+            style="margin-top:10px;"
+        >
+
+            <button
+                id="startPlotBtn"
+                onclick="startPlotting()"
+                class="btn-green"
+                disabled
+            >
+                Start Smooth Plot
+            </button>
+
+            <button
+                id="stopPlotBtn"
+                onclick="stopPlotting()"
+                class="btn-red"
+                disabled
+            >
+                Abort Plot
+            </button>
+
+        </div>
+
+
+        <!-- PROGRESS -->
+
+        <div class="progress-bar">
+
+            <div
+                id="plotProgress"
+                class="progress-fill"
+            ></div>
+
+        </div>
+
+
+        <div
+            id="plotStatusText"
+            style="margin-top:5px;font-size:14px;"
+        >
+            No SVG Loaded
+        </div>
+
+
+        <!-- PREVIEW -->
+
+        <canvas
+            id="previewCanvas"
+            width="300"
+            height="300"
+        ></canvas>
+
     </div>
+
 
 <script>
-const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+
+/* =========================================================
+   BLE SETTINGS
+========================================================= */
+
+const SERVICE_UUID =
+    "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+
+const CHARACTERISTIC_RX_UUID =
+    "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+
+
 let rxCharacteristic = null;
+
 let currentBaseAngle = 90;
 let currentJointAngle = 90;
 let currentPenState = 0;
+
 let isSending = false;
+
 let parsedPaths = [];
+let originalPaths = [];
+
 let isPlotting = false;
 let shouldAbort = false;
 
+
+/* =========================================================
+   BLUETOOTH CONNECT
+========================================================= */
+
 async function connectBLE() {
+
     try {
-        const bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ name: 'SCARA_Plotter' }],
-            optionalServices: [SERVICE_UUID]
-        });
-        const server = await bleDevice.gatt.connect();
-        const service = await server.getPrimaryService(SERVICE_UUID);
-        rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_RX_UUID);
-        document.getElementById("bleStatus").innerText = "Connected";
-        document.getElementById("bleStatus").className = "status connected";
-        if(parsedPaths.length>0) document.getElementById("startPlotBtn").disabled = false;
-    } catch (error) { alert("BLE Error: " + error); }
+
+        const bleDevice =
+            await navigator.bluetooth.requestDevice({
+
+                filters: [
+                    {
+                        name: "SCARA_Plotter"
+                    }
+                ],
+
+                optionalServices: [
+                    SERVICE_UUID
+                ]
+
+            });
+
+
+        const server =
+            await bleDevice.gatt.connect();
+
+
+        const service =
+            await server.getPrimaryService(
+                SERVICE_UUID
+            );
+
+
+        rxCharacteristic =
+            await service.getCharacteristic(
+                CHARACTERISTIC_RX_UUID
+            );
+
+
+        document.getElementById(
+            "bleStatus"
+        ).innerText = "Connected";
+
+
+        document.getElementById(
+            "bleStatus"
+        ).className = "status connected";
+
+
+        if (parsedPaths.length > 0) {
+
+            document.getElementById(
+                "startPlotBtn"
+            ).disabled = false;
+
+        }
+
+    }
+
+    catch (error) {
+
+        alert(
+            "BLE Error: " + error
+        );
+
+        console.error(error);
+
+    }
+
 }
 
-async function sendPacket(base, joint, pen) {
-    if (!rxCharacteristic) return;
-    const encoder = new TextEncoder();
-    const packet = `${Math.round(base)},${Math.round(joint)},${pen}\n`;
-    await rxCharacteristic.writeValue(encoder.encode(packet));
+
+/* =========================================================
+   SEND SERVO PACKET
+========================================================= */
+
+async function sendPacket(
+    base,
+    joint,
+    pen
+) {
+
+    if (!rxCharacteristic)
+        return;
+
+
+    /*
+       Safety clamp
+       Prevents accidental values
+       outside servo range.
+    */
+
+    base = Math.max(
+        0,
+        Math.min(180, base)
+    );
+
+    joint = Math.max(
+        20,
+        Math.min(180, joint)
+    );
+
+
+    const encoder =
+        new TextEncoder();
+
+
+    const packet =
+        `${Math.round(base)},${Math.round(joint)},${pen}\n`;
+
+
+    await rxCharacteristic.writeValue(
+        encoder.encode(packet)
+    );
+
+
     currentBaseAngle = base;
     currentJointAngle = joint;
+
 }
 
-// LOW-POWER LERP - moves one servo at a time
-async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 40) {
-    const lowPower = document.getElementById("lowPowerCheck").checked;
-    const startBase = currentBaseAngle;
-    const startJoint = currentJointAngle;
+
+/* =========================================================
+   SMOOTH SERVO MOVEMENT
+========================================================= */
+
+async function lerpMove(
+    targetBase,
+    targetJoint,
+    penState,
+    stepDelayMs = 40
+) {
+
+    const lowPower =
+        document.getElementById(
+            "lowPowerCheck"
+        ).checked;
+
+
+    const startBase =
+        currentBaseAngle;
+
+    const startJoint =
+        currentJointAngle;
+
+
+    /* -----------------------------------------------------
+       LOW POWER MODE
+    ----------------------------------------------------- */
 
     if (lowPower) {
-        // Base first, then joint = 50% peak current
-        const baseDelta = targetBase - startBase;
-        const baseSteps = Math.max(1, Math.ceil(Math.abs(baseDelta) / 0.3));
-        for (let i = 1; i <= baseSteps; i++) {
-            if (shouldAbort) break;
-            const t = i / baseSteps;
-            const b = startBase + baseDelta * t;
-            await sendPacket(b, currentJointAngle, penState);
-            await new Promise(r => setTimeout(r, stepDelayMs));
+
+        /* BASE FIRST */
+
+        const baseDelta =
+            targetBase - startBase;
+
+
+        const baseSteps =
+            Math.max(
+                1,
+                Math.ceil(
+                    Math.abs(baseDelta) / 0.3
+                )
+            );
+
+
+        for (
+            let i = 1;
+            i <= baseSteps;
+            i++
+        ) {
+
+            if (shouldAbort)
+                return;
+
+
+            const t =
+                i / baseSteps;
+
+
+            const b =
+                startBase +
+                baseDelta * t;
+
+
+            await sendPacket(
+                b,
+                currentJointAngle,
+                penState
+            );
+
+
+            await new Promise(
+                r => setTimeout(
+                    r,
+                    stepDelayMs
+                )
+            );
+
         }
-        const jointDelta = targetJoint - startJoint;
-        const jointSteps = Math.max(1, Math.ceil(Math.abs(jointDelta) / 0.3));
-        for (let i = 1; i <= jointSteps; i++) {
-            if (shouldAbort) break;
-            const t = i / jointSteps;
-            const j = startJoint + jointDelta * t;
-            await sendPacket(targetBase, j, penState);
-            await new Promise(r => setTimeout(r, stepDelayMs));
+
+
+        /* JOINT SECOND */
+
+        const jointDelta =
+            targetJoint - startJoint;
+
+
+        const jointSteps =
+            Math.max(
+                1,
+                Math.ceil(
+                    Math.abs(jointDelta) / 0.3
+                )
+            );
+
+
+        for (
+            let i = 1;
+            i <= jointSteps;
+            i++
+        ) {
+
+            if (shouldAbort)
+                return;
+
+
+            const t =
+                i / jointSteps;
+
+
+            const j =
+                startJoint +
+                jointDelta * t;
+
+
+            await sendPacket(
+                targetBase,
+                j,
+                penState
+            );
+
+
+            await new Promise(
+                r => setTimeout(
+                    r,
+                    stepDelayMs
+                )
+            );
+
         }
-    } else {
-        // Original smooth both together
-        const baseDelta = Math.abs(targetBase - startBase);
-        const jointDelta = Math.abs(targetJoint - startJoint);
-        const maxDelta = Math.max(baseDelta, jointDelta);
-        const steps = Math.max(1, Math.ceil(maxDelta / 0.5));
-        for (let i = 1; i <= steps; i++) {
-            if (shouldAbort) break;
-            const t = i / steps;
-            const interpBase = startBase + (targetBase - startBase) * t;
-            const interpJoint = startJoint + (targetJoint - startJoint) * t;
-            await sendPacket(interpBase, interpJoint, penState);
-            await new Promise(r => setTimeout(r, stepDelayMs));
-        }
+
     }
+
+
+    /* -----------------------------------------------------
+       NORMAL MODE
+    ----------------------------------------------------- */
+
+    else {
+
+        const baseDelta =
+            Math.abs(
+                targetBase - startBase
+            );
+
+
+        const jointDelta =
+            Math.abs(
+                targetJoint - startJoint
+            );
+
+
+        const maxDelta =
+            Math.max(
+                baseDelta,
+                jointDelta
+            );
+
+
+        const steps =
+            Math.max(
+                1,
+                Math.ceil(
+                    maxDelta / 0.5
+                )
+            );
+
+
+        for (
+            let i = 1;
+            i <= steps;
+            i++
+        ) {
+
+            if (shouldAbort)
+                return;
+
+
+            const t =
+                i / steps;
+
+
+            const interpBase =
+                startBase +
+                (targetBase - startBase) * t;
+
+
+            const interpJoint =
+                startJoint +
+                (targetJoint - startJoint) * t;
+
+
+            await sendPacket(
+                interpBase,
+                interpJoint,
+                penState
+            );
+
+
+            await new Promise(
+                r => setTimeout(
+                    r,
+                    stepDelayMs
+                )
+            );
+
+        }
+
+    }
+
 }
+
+
+/* =========================================================
+   MANUAL SLIDERS
+========================================================= */
 
 async function handleSliderInput() {
-    const base = parseFloat(document.getElementById("baseSlider").value);
-    const joint = parseFloat(document.getElementById("jointSlider").value);
-    document.getElementById("baseVal").innerText = base;
-    document.getElementById("jointVal").innerText = joint;
-    if (isSending ||!rxCharacteristic) return;
-    try { isSending = true; await sendPacket(base, joint, currentPenState); }
-    catch (err) { console.error("BLE Send Error:", err); }
-    finally { isSending = false; }
+
+    const base =
+        parseFloat(
+            document.getElementById(
+                "baseSlider"
+            ).value
+        );
+
+
+    const joint =
+        parseFloat(
+            document.getElementById(
+                "jointSlider"
+            ).value
+        );
+
+
+    document.getElementById(
+        "baseVal"
+    ).innerText = base;
+
+
+    document.getElementById(
+        "jointVal"
+    ).innerText = joint;
+
+
+    if (
+        isSending ||
+        !rxCharacteristic
+    )
+        return;
+
+
+    try {
+
+        isSending = true;
+
+
+        await sendPacket(
+            base,
+            joint,
+            currentPenState
+        );
+
+    }
+
+    catch (err) {
+
+        console.error(
+            "BLE Send Error:",
+            err
+        );
+
+    }
+
+    finally {
+
+        isSending = false;
+
+    }
+
 }
 
-function togglePen(state) { currentPenState = state; handleSliderInput(); }
+
+/* =========================================================
+   PEN CONTROL
+========================================================= */
+
+function togglePen(state) {
+
+    currentPenState = state;
+
+    handleSliderInput();
+
+}
+
+
+/* =========================================================
+   INVERSE KINEMATICS
+========================================================= */
 
 function predictAngles(x, y) {
-    const L1 = parseFloat(document.getElementById("L1").value) || 120;
-    const L2 = parseFloat(document.getElementById("L2").value) || 205;
-    const BASE_OFF = parseFloat(document.getElementById("baseOff").value) || 65;
-    const JOINT_OFF = parseFloat(document.getElementById("jointOff").value) || 175;
 
-    let dist2 = x*x + y*y;
-    let dist = Math.sqrt(dist2);
-    if (dist > L1+L2-2) {
-        const scale = (L1+L2-2)/dist;
-        x *= scale; y *= scale;
-        dist2 = x*x + y*y;
+    const L1 =
+        parseFloat(
+            document.getElementById(
+                "L1"
+            ).value
+        ) || 120;
+
+
+    const L2 =
+        parseFloat(
+            document.getElementById(
+                "L2"
+            ).value
+        ) || 220;
+
+
+    const BASE_OFF =
+        parseFloat(
+            document.getElementById(
+                "baseOff"
+            ).value
+        ) || 65;
+
+
+    const JOINT_OFF =
+        parseFloat(
+            document.getElementById(
+                "jointOff"
+            ).value
+        ) || 175;
+
+
+    let dist2 =
+        x * x +
+        y * y;
+
+
+    let dist =
+        Math.sqrt(dist2);
+
+
+    /* -----------------------------------------------------
+       TOO FAR AWAY
+    ----------------------------------------------------- */
+
+    if (
+        dist >
+        L1 + L2 - 2
+    ) {
+
+        const scale =
+            (L1 + L2 - 2) /
+            dist;
+
+
+        x *= scale;
+        y *= scale;
+
+
+        dist2 =
+            x * x +
+            y * y;
+
     }
-    let cosJ = (dist2 - L1*L1 - L2*L2) / (2*L1*L2);
-    cosJ = Math.max(-1, Math.min(1, cosJ));
-    let jointRad = Math.acos(cosJ);
-    let baseRad = Math.atan2(y, x) - Math.atan2(L2*Math.sin(jointRad), L1 + L2*Math.cos(jointRad));
 
-    // Tuned for your build: base normal, joint inverted
-    let baseDeg = baseRad * 180/Math.PI + BASE_OFF;
-    let jointDeg = JOINT_OFF - jointRad * 180/Math.PI;
 
-    return { base: baseDeg, joint: jointDeg };
-}
+    /* -----------------------------------------------------
+       ELBOW ANGLE
+    ----------------------------------------------------- */
 
-async function moveToTarget() {
-    const tx = parseFloat(document.getElementById("targetX").value);
-    const ty = parseFloat(document.getElementById("targetY").value);
-    if (isNaN(tx) || isNaN(ty)) { alert("Enter valid X,Y"); return; }
-    const target = predictAngles(tx, ty);
-    document.getElementById("outX").innerText = tx;
-    document.getElementById("outY").innerText = ty;
-    document.getElementById("outBase").innerText = target.base.toFixed(1);
-    document.getElementById("outJoint").innerText = target.joint.toFixed(1);
-    document.getElementById("predictionDisplay").style.display = "block";
-    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 40;
-    await lerpMove(target.base, target.joint, currentPenState, delay);
-}
+    let cosJ =
+        (
+            dist2 -
+            L1 * L1 -
+            L2 * L2
+        ) /
+        (
+            2 * L1 * L2
+        );
 
-// SVG
-function handleSVGUpload(event) {
-    const file = event.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) { parseSVGData(e.target.result); };
-    reader.readAsText(file);
-}
-function parseSVGData(svgText) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgText, "image/svg+xml");
-    parsedPaths = [];
-    let rawMinX=Infinity, rawMaxX=-Infinity, rawMinY=Infinity, rawMaxY=-Infinity;
-    doc.querySelectorAll("path, polygon, polyline, line, rect, circle").forEach(el => {
-        let pathObj = { points: [] };
-        if (el.tagName.toLowerCase() === 'path') {
-            const d = el.getAttribute("d");
-            if (d) {
-                const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                tempPath.setAttribute("d", d);
-                const length = tempPath.getTotalLength();
-                const step = Math.max(1, length / 100);
-                for (let i = 0; i <= length; i += step) {
-                    const pt = tempPath.getPointAtLength(i);
-                    pathObj.points.push({ x: pt.x, y: pt.y });
-                    rawMinX=Math.min(rawMinX,pt.x); rawMaxX=Math.max(rawMaxX,pt.x);
-                    rawMinY=Math.min(rawMinY,pt.y); rawMaxY=Math.max(rawMaxY,pt.y);
-                }
-            }
-        }
-        if (pathObj.points.length>0) parsedPaths.push(pathObj);
-    });
-    if (parsedPaths.length===0) { alert("No paths found"); return; }
-    // Auto scale to your work area ~ 0-200
-    const svgW = rawMaxX-rawMinX||1, svgH = rawMaxY-rawMinY||1;
-    const scale = Math.min(120/svgW, 120/svgH);
-    const offsetX = 60, offsetY = 60;
-    parsedPaths.forEach(p => {
-        p.points = p.points.map(pt => ({
-            x: (pt.x-rawMinX)*scale+offsetX,
-            y: (pt.y-rawMinY)*scale+offsetY
-        }));
-    });
-    document.getElementById("plotStatusText").innerText = `Loaded ${parsedPaths.length} strokes`;
-    if (rxCharacteristic) document.getElementById("startPlotBtn").disabled = false;
-    renderCanvasPreview();
-}
-function renderCanvasPreview(activePt=null) {
-    const canvas=document.getElementById("previewCanvas");
-    const ctx=canvas.getContext("2d");
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(parsedPaths.length===0) return;
-    ctx.strokeStyle="#007aff"; ctx.lineWidth=2;
-    parsedPaths.forEach(path=>{
-        ctx.beginPath();
-        path.points.forEach((pt,idx)=>{
-            const cx=pt.x*1.2, cy=canvas.height-pt.y*1.2;
-            if(idx===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
-        }); ctx.stroke();
-    });
-    if(activePt){ ctx.fillStyle="#ff3b30"; ctx.beginPath(); ctx.arc(activePt.x*1.2, canvas.height-activePt.y*1.2,5,0,Math.PI*2); ctx.fill(); }
-}
-async function startPlotting() {
-    if (!rxCharacteristic) { alert("Connect Bluetooth first!"); return; }
-    isPlotting=true; shouldAbort=false;
-    document.getElementById("startPlotBtn").disabled=true;
-    document.getElementById("stopPlotBtn").disabled=false;
-    const lerpDelay=parseInt(document.getElementById("lerpDelayInput").value)||40;
-    let total=0; parsedPaths.forEach(p=>total+=p.points.length); let cur=0;
-    for(let pIdx=0;pIdx<parsedPaths.length;pIdx++){
-        if(shouldAbort) break;
-        const path=parsedPaths[pIdx];
-        const startTarget=predictAngles(path.points[0].x, path.points[0].y);
-        await lerpMove(startTarget.base, startTarget.joint, 0, lerpDelay);
-        await new Promise(r=>setTimeout(r,200));
-        await sendPacket(startTarget.base, startTarget.joint, 1);
-        await new Promise(r=>setTimeout(r,200));
-        for(let ptIdx=0;ptIdx<path.points.length;ptIdx++){
-            if(shouldAbort) break;
-            const pt=path.points[ptIdx];
-            const angles=predictAngles(pt.x, pt.y);
-            await lerpMove(angles.base, angles.joint, 1, lerpDelay);
-            cur++; document.getElementById("plotProgress").style.width=Math.round(cur/total*100)+"%";
-            document.getElementById("plotStatusText").innerText=`Plotting... ${Math.round(cur/total*100)}%`;
-            renderCanvasPreview(pt);
-        }
-        const last=path.points[path.points.length-1];
-        const endT=predictAngles(last.x,last.y);
-        await sendPacket(endT.base, endT.joint, 0);
-        await new Promise(r=>setTimeout(r,150));
-    }
-    isPlotting=false;
-    document.getElementById("startPlotBtn").disabled=false;
-    document.getElementById("stopPlotBtn").disabled=true;
-    document.getElementById("plotStatusText").innerText=shouldAbort?"Aborted":"Done!";
-    renderCanvasPreview();
-}
-function stopPlotting(){ shouldAbort=true; }
-</script>
-</body>
-</html>
+
+    cosJ =
+        Math.max(
+            -1,
+            Math.min(
