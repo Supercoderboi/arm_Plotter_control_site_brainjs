@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCARA Wireless Controller</title>
+    <!-- In-Browser Neural Network Engine -->
+    <script src="https://unpkg.com/brain.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; background: #121212; color: #fff; }
+        .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        button { background: #007aff; color: #fff; border: none; padding: 12px 20px; font-size: 16px; border-radius: 8px; width: 100%; margin: 5px 0; }
+        button:disabled { background: #444; }
+        input { width: calc(100% - 20px); padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #333; background: #2c2c2c; color: #fff; font-size: 16px; }
+        .row { display: flex; gap: 10px; }
+        .status { font-weight: bold; color: #ff3b30; }
+        .connected { color: #34c759; }
+    </style>
+</head>
+<body>
+
+    <h2>SCARA Wireless Plotter</h2>
+    <div class="card">
+        <div>Status: <span id="bleStatus" class="status">Disconnected</span></div>
+        <button id="connectBtn" onclick="connectBLE()">Connect Bluetooth</button>
+    </div>
+
+    <div class="card">
+        <h3>Manual Servo Control</h3>
+        <label>Base Angle (0-180): <span id="baseVal">90</span>°</label>
+        <input type="range" id="baseSlider" min="0" max="180" value="90" oninput="updateSliders()">
+        
+        <label>Joint Angle (20-180): <span id="jointVal">45</span>°</label>
+        <input type="range" id="jointSlider" min="20" max="180" value="45" oninput="updateSliders()">
+
+        <div class="row">
+            <button onclick="togglePen(1)">Pen DOWN</button>
+            <button onclick="togglePen(0)">Pen UP</button>
+        </div>
+        <button onclick="sendManualCommand()">Send Manual Angles</button>
+    </div>
+
+    <div class="card">
+        <h3>Add Calibration Point</h3>
+        <div class="row">
+            <input type="number" id="calX" placeholder="X (mm)">
+            <input type="number" id="calY" placeholder="Y (mm)">
+        </div>
+        <button onclick="addPoint()">Save Current Angles to (X, Y)</button>
+        <div id="pointCount">Saved Points: 0</div>
+        <button onclick="trainNetwork()" style="background:#34c759;">Train Neural Net</button>
+    </div>
+
+    <div class="card">
+        <h3>Move to Cartesian (X, Y)</h3>
+        <div class="row">
+            <input type="number" id="targetX" placeholder="Target X (mm)">
+            <input type="number" id="targetY" placeholder="Target Y (mm)">
+        </div>
+        <button onclick="moveToTarget()">Move via NN Model</button>
+    </div>
+
+<script>
+// BLE UUIDs
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+
+let rxCharacteristic = null;
+let bleDevice = null;
+let dataset = [];
+let net = new brain.NeuralNetwork({ hiddenLayers: [8, 8] });
+let isTrained = false;
+let currentPenState = 0;
+
+async function connectBLE() {
+    try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ name: 'SCARA_Plotter' }],
+            optionalServices: [SERVICE_UUID]
+        });
+
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_RX_UUID);
+
+        document.getElementById("bleStatus").innerText = "Connected";
+        document.getElementById("bleStatus").className = "status connected";
+    } catch (error) {
+        alert("BLE Error: " + error);
+    }
+}
+
+async function sendPacket(base, joint, pen) {
+    if (!rxCharacteristic) {
+        alert("Bluetooth not connected!");
+        return;
+    }
+    const encoder = new TextEncoder();
+    const packet = `${base},${joint},${pen}\n`;
+    await rxCharacteristic.writeValue(encoder.encode(packet));
+}
+
+function updateSliders() {
+    document.getElementById("baseVal").innerText = document.getElementById("baseSlider").value;
+    document.getElementById("jointVal").innerText = document.getElementById("jointSlider").value;
+}
+
+function togglePen(state) {
+    currentPenState = state;
+    sendManualCommand();
+}
+
+function sendManualCommand() {
+    const base = document.getElementById("baseSlider").value;
+    const joint = document.getElementById("jointSlider").value;
+    sendPacket(base, joint, currentPenState);
+}
+
+function addPoint() {
+    const x = parseFloat(document.getElementById("calX").value);
+    const y = parseFloat(document.getElementById("calY").value);
+    const base = parseFloat(document.getElementById("baseSlider").value);
+    const joint = parseFloat(document.getElementById("jointSlider").value);
+
+    if (isNaN(x) || isNaN(y)) {
+        alert("Enter valid X and Y coordinates in mm!");
+        return;
+    }
+
+    // Normalize inputs for Brain.js (0.0 to 1.0)
+    dataset.push({
+        input: { x: x / 300, y: y / 300 },
+        output: { base: base / 180, joint: joint / 180 }
+    });
+
+    document.getElementById("pointCount").innerText = `Saved Points: ${dataset.length}`;
+    alert(`Point added: (${x}mm, ${y}mm) -> Base: ${base}°, Joint: ${joint}°`);
+}
+
+function trainNetwork() {
+    if (dataset.length < 3) {
+        alert("Add at least 3 calibration points first!");
+        return;
+    }
+    net.train(dataset, { iterations: 2000, errorThresh: 0.005 });
+    isTrained = true;
+    alert("Neural Network trained successfully in browser!");
+}
+
+function moveToTarget() {
+    if (!isTrained) {
+        alert("Train the Neural Network model first!");
+        return;
+    }
+    const tx = parseFloat(document.getElementById("targetX").value);
+    const ty = parseFloat(document.getElementById("targetY").value);
+
+    const output = net.run({ x: tx / 300, y: ty / 300 });
+    const predBase = Math.round(output.base * 180);
+    const predJoint = Math.round(output.joint * 180);
+
+    sendPacket(predBase, predJoint, currentPenState);
+}
+</script>
+</body>
+</html>
