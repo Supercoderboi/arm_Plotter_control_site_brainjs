@@ -1,547 +1,444 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCARA Wireless Controller - IK Version</title>
-
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            padding: 15px;
-            background: #121212;
-            color: #fff;
-        }
-
-        .card {
-            background: #1e1e1e;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-        }
-
-        button {
-            background: #007aff;
-            color: #fff;
-            border: none;
-            padding: 12px 20px;
-            font-size: 16px;
-            border-radius: 8px;
-            width: 100%;
-            margin: 5px 0;
-            cursor: pointer;
-        }
-
-        button:disabled {
-            background: #444;
-        }
-
-        .btn-green {
-            background: #34c759;
-        }
-
-        .btn-red {
-            background: #ff3b30;
-        }
-
-        .btn-secondary {
-            background: #5856d6;
-        }
-
-        input[type="number"],
-        input[type="text"] {
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 6px;
-            border: 1px solid #333;
-            background: #2c2c2c;
-            color: #fff;
-            font-size: 16px;
-        }
-
-        input[type="range"] {
-            width: 100%;
-        }
-
-        .row {
-            display: flex;
-            gap: 10px;
-        }
-
-        .status {
-            font-weight: bold;
-            color: #ff3b30;
-        }
-
-        .connected {
-            color: #34c759;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-
-        th,
-        td {
-            border: 1px solid #333;
-            padding: 8px;
-            text-align: center;
-        }
-
-        th {
-            background: #2a2a2a;
-        }
-
-        td input {
-            width: 90%;
-            padding: 4px;
-            margin: 0;
-        }
-
-        .prediction-box {
-            background: #2a2a2a;
-            border-left: 4px solid #007aff;
-            padding: 10px;
-            margin-top: 10px;
-            border-radius: 4px;
-        }
-
-        canvas {
-            background: #000;
-            border-radius: 8px;
-            width: 100%;
-            height: auto;
-            margin-top: 10px;
-            border: 1px solid #333;
-        }
-
-        .progress-bar {
-            background: #333;
-            height: 10px;
-            border-radius: 5px;
-            overflow: hidden;
-            margin-top: 10px;
-        }
-
-        .progress-fill {
-            background: #34c759;
-            height: 100%;
-            width: 0%;
-            transition: width 0.1s;
-        }
-
-        .setting-label {
-            font-size: 13px;
-            color: #aaa;
-            margin-top: 6px;
-        }
-
-        .value-label {
-            font-size: 14px;
-            color: #ddd;
-        }
-    </style>
-</head>
-
-<body>
-
-    <h2>SCARA Wireless Plotter - IK Math (No NN)</h2>
-
-    <!-- ============================= -->
-    <!-- BLUETOOTH -->
-    <!-- ============================= -->
-
-    <div class="card">
-
-        <div>
-            Status:
-            <span id="bleStatus" class="status">
-                Disconnected
-            </span>
-        </div>
-
-        <button id="connectBtn" onclick="connectBLE()">
-            Connect Bluetooth
-        </button>
-
-    </div>
-
-
-    <!-- ============================= -->
-    <!-- IK SETTINGS -->
-    <!-- ============================= -->
-
-    <div class="card">
-
-        <h3>IK Settings</h3>
-
-        <div class="row">
-
-            <div style="flex:1">
-                L1
-                <input
-                    type="number"
-                    id="L1"
-                    value="120"
-                    min="1"
-                    step="0.1"
-                >
-            </div>
-
-            <div style="flex:1">
-                L2
-                <input
-                    type="number"
-                    id="L2"
-                    value="220"
-                    min="1"
-                    step="0.1"
-                >
-            </div>
-
-        </div>
-
-        <div class="row">
-
-            <div style="flex:1">
-                Base Off
-                <input
-                    type="number"
-                    id="baseOff"
-                    value="65"
-                    step="0.1"
-                >
-            </div>
-
-            <div style="flex:1">
-                Joint Off
-                <input
-                    type="number"
-                    id="jointOff"
-                    value="175"
-                    step="0.1"
-                >
-            </div>
-
-        </div>
-
-        <div class="setting-label">
-            L1 and L2 are your physical arm lengths.
-            Offsets compensate for your servo mounting/calibration.
-        </div>
-
-    </div>
-
-
-    <!-- ============================= -->
-    <!-- MANUAL SERVO CONTROL -->
-    <!-- ============================= -->
-
-    <div class="card">
-
-        <h3>Manual Servo Control</h3>
-
-        <label>
-            Base Angle (0-180):
-            <span id="baseVal">90</span>°
-        </label>
-
-        <input
-            type="range"
-            id="baseSlider"
-            min="0"
-            max="180"
-            value="90"
-            step="1"
-            oninput="handleSliderInput()"
-        >
-
-        <label>
-            Joint Angle (20-180):
-            <span id="jointVal">90</span>°
-        </label>
-
-        <input
-            type="range"
-            id="jointSlider"
-            min="20"
-            max="180"
-            value="90"
-            step="1"
-            oninput="handleSliderInput()"
-        >
-
-        <div class="row">
-
-            <button onclick="togglePen(1)">
-                Pen DOWN
-            </button>
-
-            <button onclick="togglePen(0)">
-                Pen UP
-            </button>
-
-        </div>
-
-    </div>
-
-
-    <!-- ============================= -->
-    <!-- CARTESIAN IK -->
-    <!-- ============================= -->
-
-    <div class="card">
-
-        <h3>Move to Target Cartesian (X, Y)</h3>
-
-        <div class="row">
-
-            <input
-                type="number"
-                id="targetX"
-                placeholder="Target X (mm)"
-                value="100"
-                step="1"
-            >
-
-            <input
-                type="number"
-                id="targetY"
-                placeholder="Target Y (mm)"
-                value="100"
-                step="1"
-            >
-
-        </div>
-
-        <button
-            onclick="moveToTarget()"
-            class="btn-green"
-        >
-            Move via IK (Smooth)
-        </button>
-
-        <div
-            id="predictionDisplay"
-            class="prediction-box"
-            style="display:none;"
-        >
-
-            <strong>Target:</strong>
-            X:
-            <span id="outX">0</span>
-            mm,
-            Y:
-            <span id="outY">0</span>
-            mm
-
-            <br>
-
-            <strong>IK Angles:</strong>
-            Base:
-            <span id="outBase">0</span>°,
-            Joint:
-            <span id="outJoint">0</span>°
-
-        </div>
-
-    </div>
-
-
-    <!-- ============================= -->
-    <!-- SVG PLOTTER -->
-    <!-- ============================= -->
-
-    <div class="card">
-
-        <h3>SVG Plotter Engine</h3>
-
-        <button
-            onclick="document.getElementById('svgFileInput').click()"
-            class="btn-secondary"
-        >
-            Load SVG File
-        </button>
-
-        <input
-            type="file"
-            id="svgFileInput"
-            accept=".svg"
-            style="display:none;"
-            onchange="handleSVGUpload(event)"
-        >
-
-
-        <!-- SVG POSITION -->
-
-        <h4>SVG Position & Size</h4>
-
-        <div class="row">
-
-            <div style="flex:1">
-
-                <div class="setting-label">
-                    X Position (mm)
-                </div>
-
-                <input
-                    type="number"
-                    id="svgX"
-                    value="60"
-                    step="1"
-                    oninput="updateSVGTransform()"
-                >
-
-            </div>
-
-
-            <div style="flex:1">
-
-                <div class="setting-label">
-                    Y Position (mm)
-                </div>
-
-                <input
-                    type="number"
-                    id="svgY"
-                    value="60"
-                    step="1"
-                    oninput="updateSVGTransform()"
-                >
-
-            </div>
-
-        </div>
-
-
-        <!-- SVG SCALE -->
-
-        <div class="setting-label">
-            Size / Scale
-        </div>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCARA Wireless Plotter</title><style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 15px;
+    background: #121212;
+    color: white;
+}
+
+.card {
+    background: #1e1e1e;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+}
+
+h2, h3, h4 {
+    margin-top: 5px;
+}
+
+button {
+    width: 100%;
+    padding: 13px;
+    margin: 5px 0;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    background: #007aff;
+    font-size: 16px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    background: #444 !important;
+    color: #888;
+}
+
+.btn-green {
+    background: #34c759;
+}
+
+.btn-red {
+    background: #ff3b30;
+}
+
+.btn-purple {
+    background: #5856d6;
+}
+
+.row {
+    display: flex;
+    gap: 10px;
+}
+
+.row > * {
+    min-width: 0;
+}
+
+input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 7px;
+    border: 1px solid #444;
+    background: #2b2b2b;
+    color: white;
+    font-size: 16px;
+}
+
+input[type="range"] {
+    width: 100%;
+    margin: 10px 0 18px;
+}
+
+input[type="checkbox"] {
+    transform: scale(1.2);
+    margin-right: 7px;
+}
+
+.status {
+    font-weight: bold;
+    color: #ff3b30;
+}
+
+.connected {
+    color: #34c759;
+}
+
+.setting-label {
+    color: #aaa;
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+.prediction-box {
+    background: #292929;
+    border-left: 4px solid #007aff;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 5px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 10px;
+    background: #333;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.progress-fill {
+    width: 0%;
+    height: 100%;
+    background: #34c759;
+    transition: width 0.1s;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin-top: 12px;
+    background: black;
+    border: 1px solid #444;
+    border-radius: 8px;
+}
+
+.small {
+    color: #aaa;
+    font-size: 12px;
+}
+
+#log {
+    background: #111;
+    border-radius: 7px;
+    padding: 8px;
+    margin-top: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+</style></head><body><h2>SCARA Wireless Plotter</h2><!-- ================================================= --><!-- BLUETOOTH --><!-- ================================================= --><div class="card"><h3>Bluetooth</h3>
+
+<div>
+    Status:
+    <span id="bleStatus" class="status">
+        Disconnected
+    </span>
+</div>
+
+<button id="connectBtn">
+    Connect Bluetooth
+</button>
+
+<div class="small">
+    ESP32 device name must be:
+    <b>SCARA_Plotter</b>
+</div>
+
+</div><!-- ================================================= --><!-- IK SETTINGS --><!-- ================================================= --><div class="card"><h3>IK Settings</h3>
+
+<div class="row">
+
+    <div style="flex:1">
+        <label>L1 (mm)</label>
         <input
             type="number"
-            id="svgScale"
-            value="1.0"
-            min="0.05"
-            max="5"
-            step="0.05"
-            oninput="updateSVGTransform()"
-        >
-
-        <div class="setting-label">
-            1.0 = current size,
-            2.0 = twice as large,
-            0.5 = half size
-        </div>
-
-
-        <button
-            onclick="centerSVG()"
-            class="btn-secondary"
-        >
-            Center SVG
-        </button>
-
-
-        <!-- DELAY -->
-
-        <div class="setting-label">
-            Delay per step (ms)
-        </div>
-
-        <input
-            type="number"
-            id="lerpDelayInput"
-            value="40"
-            min="10"
-            max="100"
-        >
-
-
-        <!-- LOW POWER -->
-
-        <label style="font-size:14px">
-
-            <input
-                type="checkbox"
-                id="lowPowerCheck"
-                checked
-            >
-
-            Low-Power Mode
-            (move one servo at a time)
-
-        </label>
-
-
-        <!-- PLOT BUTTONS -->
-
-        <div
-            class="row"
-            style="margin-top:10px;"
-        >
-
-            <button
-                id="startPlotBtn"
-                onclick="startPlotting()"
-                class="btn-green"
-                disabled
-            >
-                Start Smooth Plot
-            </button>
-
-            <button
-                id="stopPlotBtn"
-                onclick="stopPlotting()"
-                class="btn-red"
-                disabled
-            >
-                Abort Plot
-            </button>
-
-        </div>
-
-
-        <!-- PROGRESS -->
-
-        <div class="progress-bar">
-
-            <div
-                id="plotProgress"
-                class="progress-fill"
-            ></div>
-
-        </div>
-
-
-        <div
-            id="plotStatusText"
-            style="margin-top:5px;font-size:14px;"
-        >
-            No SVG Loaded
-        </div>
-
-
-        <!-- PREVIEW -->
-
-        <canvas
-            id="previewCanvas"
-            width="300"
-            height="300"
-        ></canvas>
-
+            id="L1"
+            value="120"
+            min="1"
+            step="0.1">
     </div>
 
+    <div style="flex:1">
+        <label>L2 (mm)</label>
+        <input
+            type="number"
+            id="L2"
+            value="220"
+            min="1"
+            step="0.1">
+    </div>
 
-<script>
+</div>
+
+<div class="row">
+
+    <div style="flex:1">
+        <label>Base Offset</label>
+        <input
+            type="number"
+            id="baseOff"
+            value="65"
+            step="0.1">
+    </div>
+
+    <div style="flex:1">
+        <label>Joint Offset</label>
+        <input
+            type="number"
+            id="jointOff"
+            value="175"
+            step="0.1">
+    </div>
+
+</div>
+
+<div class="setting-label">
+    Current physical arm: L1 = 120 mm, L2 = 220 mm.
+</div>
+
+</div><!-- ================================================= --><!-- MANUAL CONTROL --><!-- ================================================= --><div class="card"><h3>Manual Servo Control</h3>
+
+<label>
+    Base:
+    <span id="baseVal">90</span>°
+</label>
+
+<input
+    type="range"
+    id="baseSlider"
+    min="0"
+    max="180"
+    value="90"
+    step="1">
+
+<label>
+    Joint:
+    <span id="jointVal">90</span>°
+</label>
+
+<input
+    type="range"
+    id="jointSlider"
+    min="20"
+    max="180"
+    value="90"
+    step="1">
+
+<div class="row">
+
+    <button
+        id="penDownBtn"
+        class="btn-green">
+        Pen DOWN
+    </button>
+
+    <button
+        id="penUpBtn"
+        class="btn-purple">
+        Pen UP
+    </button>
+
+</div>
+
+</div><!-- ================================================= --><!-- CARTESIAN --><!-- ================================================= --><div class="card"><h3>Cartesian IK</h3>
+
+<div class="row">
+
+    <div style="flex:1">
+        <label>X (mm)</label>
+        <input
+            type="number"
+            id="targetX"
+            value="100"
+            step="1">
+    </div>
+
+    <div style="flex:1">
+        <label>Y (mm)</label>
+        <input
+            type="number"
+            id="targetY"
+            value="100"
+            step="1">
+    </div>
+
+</div>
+
+<button
+    id="moveTargetBtn"
+    class="btn-green">
+    Move via IK
+</button>
+
+<div
+    id="predictionDisplay"
+    class="prediction-box"
+    style="display:none;">
+
+    Target:
+    <b>X <span id="outX">0</span></b>,
+    <b>Y <span id="outY">0</span></b>
+
+    <br>
+
+    Base:
+    <b><span id="outBase">0</span>°</b>
+
+    <br>
+
+    Joint:
+    <b><span id="outJoint">0</span>°</b>
+
+</div>
+
+</div><!-- ================================================= --><!-- SVG --><!-- ================================================= --><div class="card"><h3>SVG Plotter</h3>
+
+<button
+    id="loadSvgBtn"
+    class="btn-purple">
+    Load SVG File
+</button>
+
+<input
+    type="file"
+    id="svgFileInput"
+    accept=".svg"
+    style="display:none;">
+
+<h4>SVG Position</h4>
+
+<div class="row">
+
+    <div style="flex:1">
+        <label>X Position</label>
+        <input
+            type="number"
+            id="svgX"
+            value="60"
+            step="1">
+    </div>
+
+    <div style="flex:1">
+        <label>Y Position</label>
+        <input
+            type="number"
+            id="svgY"
+            value="60"
+            step="1">
+    </div>
+
+</div>
+
+<label>Scale</label>
+
+<input
+    type="number"
+    id="svgScale"
+    value="1"
+    min="0.05"
+    max="5"
+    step="0.05">
+
+<button
+    id="centerSvgBtn"
+    class="btn-purple">
+    Center SVG
+</button>
+
+<div class="setting-label">
+    Delay per step (ms)
+</div>
+
+<input
+    type="number"
+    id="lerpDelayInput"
+    value="40"
+    min="10"
+    max="200">
+
+<label>
+    <input
+        type="checkbox"
+        id="lowPowerCheck"
+        checked>
+    Low-Power Mode
+</label>
+
+<div class="row" style="margin-top:10px">
+
+    <button
+        id="startPlotBtn"
+        class="btn-green"
+        disabled>
+        Start Plot
+    </button>
+
+    <button
+        id="stopPlotBtn"
+        class="btn-red"
+        disabled>
+        Abort
+    </button>
+
+</div>
+
+<div class="progress-bar">
+    <div
+        id="plotProgress"
+        class="progress-fill">
+    </div>
+</div>
+
+<div
+    id="plotStatusText"
+    style="margin-top:8px">
+    No SVG loaded
+</div>
+
+<canvas
+    id="previewCanvas"
+    width="300"
+    height="300">
+</canvas>
+
+</div><!-- ================================================= --><!-- DEBUG LOG --><!-- ================================================= --><div class="card"><h3>Debug</h3>
+
+<div id="log">
+    Ready.
+</div>
+
+</div><script>
 
 /* =========================================================
-   BLE SETTINGS
+   BLE
 ========================================================= */
 
 const SERVICE_UUID =
@@ -550,36 +447,140 @@ const SERVICE_UUID =
 const CHARACTERISTIC_RX_UUID =
     "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
+const DEVICE_NAME =
+    "SCARA_Plotter";
 
+
+let bleDevice = null;
 let rxCharacteristic = null;
 
 let currentBaseAngle = 90;
 let currentJointAngle = 90;
 let currentPenState = 0;
 
-let isSending = false;
-
 let parsedPaths = [];
 let originalPaths = [];
 
-let isPlotting = false;
 let shouldAbort = false;
+let isPlotting = false;
+let isSending = false;
 
 
 /* =========================================================
-   BLUETOOTH CONNECT
+   ELEMENTS
+========================================================= */
+
+const connectBtn =
+    document.getElementById("connectBtn");
+
+const penDownBtn =
+    document.getElementById("penDownBtn");
+
+const penUpBtn =
+    document.getElementById("penUpBtn");
+
+const moveTargetBtn =
+    document.getElementById("moveTargetBtn");
+
+const loadSvgBtn =
+    document.getElementById("loadSvgBtn");
+
+const svgFileInput =
+    document.getElementById("svgFileInput");
+
+const centerSvgBtn =
+    document.getElementById("centerSvgBtn");
+
+const startPlotBtn =
+    document.getElementById("startPlotBtn");
+
+const stopPlotBtn =
+    document.getElementById("stopPlotBtn");
+
+const baseSlider =
+    document.getElementById("baseSlider");
+
+const jointSlider =
+    document.getElementById("jointSlider");
+
+const baseVal =
+    document.getElementById("baseVal");
+
+const jointVal =
+    document.getElementById("jointVal");
+
+
+/* =========================================================
+   LOG
+========================================================= */
+
+function log(message) {
+
+    const box =
+        document.getElementById("log");
+
+    const time =
+        new Date().toLocaleTimeString();
+
+    box.innerHTML +=
+        `<br>[${time}] ${message}`;
+
+    box.scrollTop =
+        box.scrollHeight;
+
+    console.log(message);
+}
+
+
+/* =========================================================
+   BLE STATUS
+========================================================= */
+
+function setBLEStatus(text, connected) {
+
+    const status =
+        document.getElementById("bleStatus");
+
+    status.innerText = text;
+
+    if (connected) {
+        status.className =
+            "status connected";
+    } else {
+        status.className =
+            "status";
+    }
+}
+
+
+/* =========================================================
+   CONNECT
 ========================================================= */
 
 async function connectBLE() {
 
+    if (!navigator.bluetooth) {
+
+        alert(
+            "Web Bluetooth is not supported in this browser.\n\n" +
+            "Use Chrome/Chromium over HTTPS."
+        );
+
+        log("Web Bluetooth unavailable.");
+
+        return;
+    }
+
     try {
 
-        const bleDevice =
+        log("Opening Bluetooth device chooser...");
+
+        bleDevice =
             await navigator.bluetooth.requestDevice({
 
                 filters: [
                     {
-                        name: "SCARA_Plotter"
+                        name: DEVICE_NAME
                     }
                 ],
 
@@ -589,58 +590,103 @@ async function connectBLE() {
 
             });
 
+        log(
+            "Selected: " +
+            bleDevice.name
+        );
+
+        bleDevice.addEventListener(
+            "gattserverdisconnected",
+            handleDisconnect
+        );
+
+        log("Connecting to ESP32...");
 
         const server =
             await bleDevice.gatt.connect();
 
+        log("GATT connected.");
 
         const service =
             await server.getPrimaryService(
                 SERVICE_UUID
             );
 
+        log("Service found.");
 
         rxCharacteristic =
             await service.getCharacteristic(
                 CHARACTERISTIC_RX_UUID
             );
 
+        log("Write characteristic found.");
 
-        document.getElementById(
-            "bleStatus"
-        ).innerText = "Connected";
+        setBLEStatus(
+            "Connected",
+            true
+        );
 
+        connectBtn.innerText =
+            "Bluetooth Connected";
 
-        document.getElementById(
-            "bleStatus"
-        ).className = "status connected";
-
+        connectBtn.disabled = true;
 
         if (parsedPaths.length > 0) {
-
-            document.getElementById(
-                "startPlotBtn"
-            ).disabled = false;
-
+            startPlotBtn.disabled = false;
         }
+
+        log("READY.");
 
     }
 
     catch (error) {
 
-        alert(
-            "BLE Error: " + error
-        );
-
         console.error(error);
 
-    }
+        log(
+            "BLE ERROR: " +
+            error.message
+        );
 
+        setBLEStatus(
+            "Disconnected",
+            false
+        );
+
+        alert(
+            "Bluetooth connection failed:\n\n" +
+            error.message
+        );
+    }
 }
 
 
 /* =========================================================
-   SEND SERVO PACKET
+   DISCONNECT
+========================================================= */
+
+function handleDisconnect() {
+
+    rxCharacteristic = null;
+
+    setBLEStatus(
+        "Disconnected",
+        false
+    );
+
+    connectBtn.innerText =
+        "Connect Bluetooth";
+
+    connectBtn.disabled = false;
+
+    startPlotBtn.disabled = true;
+
+    log("ESP32 disconnected.");
+}
+
+
+/* =========================================================
+   SEND PACKET
 ========================================================= */
 
 async function sendPacket(
@@ -649,62 +695,478 @@ async function sendPacket(
     pen
 ) {
 
-    if (!rxCharacteristic)
-        return;
+    if (!rxCharacteristic) {
 
+        log("Not connected.");
 
-    /*
-       Safety clamp
-       Prevents accidental values
-       outside servo range.
-    */
+        return false;
+    }
 
-    base = Math.max(
-        0,
-        Math.min(180, base)
-    );
+    base =
+        Math.max(
+            0,
+            Math.min(
+                180,
+                base
+            )
+        );
 
-    joint = Math.max(
-        20,
-        Math.min(180, joint)
-    );
+    joint =
+        Math.max(
+            20,
+            Math.min(
+                180,
+                joint
+            )
+        );
 
-
-    const encoder =
-        new TextEncoder();
-
+    pen =
+        pen ? 1 : 0;
 
     const packet =
         `${Math.round(base)},${Math.round(joint)},${pen}\n`;
 
+    try {
 
-    await rxCharacteristic.writeValue(
-        encoder.encode(packet)
-    );
+        const encoder =
+            new TextEncoder();
 
+        await rxCharacteristic.writeValue(
+            encoder.encode(packet)
+        );
 
-    currentBaseAngle = base;
-    currentJointAngle = joint;
+        currentBaseAngle = base;
+        currentJointAngle = joint;
 
+        return true;
+
+    }
+
+    catch (error) {
+
+        log(
+            "SEND ERROR: " +
+            error.message
+        );
+
+        return false;
+    }
 }
 
 
 /* =========================================================
-   SMOOTH SERVO MOVEMENT
+   MANUAL SLIDER
+========================================================= */
+
+baseSlider.addEventListener(
+    "input",
+    async function() {
+
+        baseVal.innerText =
+            this.value;
+
+        if (!rxCharacteristic)
+            return;
+
+        if (isSending)
+            return;
+
+        isSending = true;
+
+        await sendPacket(
+            Number(this.value),
+            Number(jointSlider.value),
+            currentPenState
+        );
+
+        isSending = false;
+    }
+);
+
+
+jointSlider.addEventListener(
+    "input",
+    async function() {
+
+        jointVal.innerText =
+            this.value;
+
+        if (!rxCharacteristic)
+            return;
+
+        if (isSending)
+            return;
+
+        isSending = true;
+
+        await sendPacket(
+            Number(baseSlider.value),
+            Number(this.value),
+            currentPenState
+        );
+
+        isSending = false;
+    }
+);
+
+
+/* =========================================================
+   PEN
+========================================================= */
+
+async function setPen(state) {
+
+    currentPenState =
+        state ? 1 : 0;
+
+    const ok =
+        await sendPacket(
+            currentBaseAngle,
+            currentJointAngle,
+            currentPenState
+        );
+
+    if (ok) {
+
+        log(
+            state
+                ? "Pen DOWN"
+                : "Pen UP"
+        );
+
+    }
+}
+
+
+penDownBtn.addEventListener(
+    "click",
+    function() {
+        setPen(1);
+    }
+);
+
+
+penUpBtn.addEventListener(
+    "click",
+    function() {
+        setPen(0);
+    }
+);
+
+
+/* =========================================================
+   IK
+========================================================= */
+
+function predictAngles(x, y) {
+
+    const L1 =
+        Number(
+            document.getElementById("L1").value
+        ) || 120;
+
+    const L2 =
+        Number(
+            document.getElementById("L2").value
+        ) || 220;
+
+    const baseOff =
+        Number(
+            document.getElementById("baseOff").value
+        );
+
+    const jointOff =
+        Number(
+            document.getElementById("jointOff").value
+        );
+
+    let distance =
+        Math.sqrt(
+            x * x +
+            y * y
+        );
+
+    const maxReach =
+        L1 + L2 - 2;
+
+    const minReach =
+        Math.abs(L1 - L2) + 1;
+
+
+    /* Too far */
+
+    if (distance > maxReach) {
+
+        const scale =
+            maxReach / distance;
+
+        x *= scale;
+        y *= scale;
+
+        distance =
+            maxReach;
+    }
+
+
+    /* Too close */
+
+    if (distance < minReach) {
+
+        throw new Error(
+            "Target is inside the unreachable area.\n" +
+            "Minimum radius: " +
+            minReach.toFixed(1) +
+            " mm"
+        );
+    }
+
+
+    const d2 =
+        x * x +
+        y * y;
+
+
+    let cosJoint =
+        (
+            d2 -
+            L1 * L1 -
+            L2 * L2
+        ) /
+        (
+            2 *
+            L1 *
+            L2
+        );
+
+
+    cosJoint =
+        Math.max(
+            -1,
+            Math.min(
+                1,
+                cosJoint
+            )
+        );
+
+
+    const jointRad =
+        Math.acos(
+            cosJoint
+        );
+
+
+    const baseRad =
+        Math.atan2(
+            y,
+            x
+        ) -
+        Math.atan2(
+            L2 *
+            Math.sin(jointRad),
+
+            L1 +
+            L2 *
+            Math.cos(jointRad)
+        );
+
+
+    const baseDeg =
+        baseRad *
+        180 /
+        Math.PI +
+        baseOff;
+
+
+    const jointDeg =
+        jointOff -
+        jointRad *
+        180 /
+        Math.PI;
+
+
+    return {
+
+        base:
+            Math.max(
+                0,
+                Math.min(
+                    180,
+                    baseDeg
+                )
+            ),
+
+        joint:
+            Math.max(
+                20,
+                Math.min(
+                    180,
+                    jointDeg
+                )
+            )
+
+    };
+}
+
+
+/* =========================================================
+   MOVE TO TARGET
+========================================================= */
+
+moveTargetBtn.addEventListener(
+    "click",
+    moveToTarget
+);
+
+
+async function moveToTarget() {
+
+    if (!rxCharacteristic) {
+
+        alert(
+            "Connect Bluetooth first!"
+        );
+
+        return;
+    }
+
+
+    const x =
+        Number(
+            document.getElementById(
+                "targetX"
+            ).value
+        );
+
+    const y =
+        Number(
+            document.getElementById(
+                "targetY"
+            ).value
+        );
+
+
+    if (
+        !Number.isFinite(x) ||
+        !Number.isFinite(y)
+    ) {
+
+        alert(
+            "Enter valid X and Y."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        const angles =
+            predictAngles(
+                x,
+                y
+            );
+
+
+        document.getElementById(
+            "outX"
+        ).innerText =
+            x.toFixed(1);
+
+
+        document.getElementById(
+            "outY"
+        ).innerText =
+            y.toFixed(1);
+
+
+        document.getElementById(
+            "outBase"
+        ).innerText =
+            angles.base.toFixed(1);
+
+
+        document.getElementById(
+            "outJoint"
+        ).innerText =
+            angles.joint.toFixed(1);
+
+
+        document.getElementById(
+            "predictionDisplay"
+        ).style.display =
+            "block";
+
+
+        const delay =
+            Number(
+                document.getElementById(
+                    "lerpDelayInput"
+                ).value
+            ) || 40;
+
+
+        shouldAbort = false;
+
+
+        await lerpMove(
+            angles.base,
+            angles.joint,
+            currentPenState,
+            delay
+        );
+
+
+        baseSlider.value =
+            Math.round(
+                angles.base
+            );
+
+        jointSlider.value =
+            Math.round(
+                angles.joint
+            );
+
+        baseVal.innerText =
+            Math.round(
+                angles.base
+            );
+
+        jointVal.innerText =
+            Math.round(
+                angles.joint
+            );
+
+
+        log(
+            `Moved to X=${x}, Y=${y}`
+        );
+
+    }
+
+    catch (error) {
+
+        alert(
+            error.message
+        );
+
+        log(
+            "IK ERROR: " +
+            error.message
+        );
+    }
+}
+
+
+/* =========================================================
+   SMOOTH MOVE
 ========================================================= */
 
 async function lerpMove(
     targetBase,
     targetJoint,
     penState,
-    stepDelayMs = 40
+    delay
 ) {
-
-    const lowPower =
-        document.getElementById(
-            "lowPowerCheck"
-        ).checked;
-
 
     const startBase =
         currentBaseAngle;
@@ -713,366 +1175,1332 @@ async function lerpMove(
         currentJointAngle;
 
 
-    /* -----------------------------------------------------
-       LOW POWER MODE
-    ----------------------------------------------------- */
-
-    if (lowPower) {
-
-        /* BASE FIRST */
-
-        const baseDelta =
-            targetBase - startBase;
-
-
-        const baseSteps =
-            Math.max(
-                1,
-                Math.ceil(
-                    Math.abs(baseDelta) / 0.3
-                )
-            );
-
-
-        for (
-            let i = 1;
-            i <= baseSteps;
-            i++
-        ) {
-
-            if (shouldAbort)
-                return;
-
-
-            const t =
-                i / baseSteps;
-
-
-            const b =
-                startBase +
-                baseDelta * t;
-
-
-            await sendPacket(
-                b,
-                currentJointAngle,
-                penState
-            );
-
-
-            await new Promise(
-                r => setTimeout(
-                    r,
-                    stepDelayMs
-                )
-            );
-
-        }
-
-
-        /* JOINT SECOND */
-
-        const jointDelta =
-            targetJoint - startJoint;
-
-
-        const jointSteps =
-            Math.max(
-                1,
-                Math.ceil(
-                    Math.abs(jointDelta) / 0.3
-                )
-            );
-
-
-        for (
-            let i = 1;
-            i <= jointSteps;
-            i++
-        ) {
-
-            if (shouldAbort)
-                return;
-
-
-            const t =
-                i / jointSteps;
-
-
-            const j =
-                startJoint +
-                jointDelta * t;
-
-
-            await sendPacket(
-                targetBase,
-                j,
-                penState
-            );
-
-
-            await new Promise(
-                r => setTimeout(
-                    r,
-                    stepDelayMs
-                )
-            );
-
-        }
-
-    }
-
-
-    /* -----------------------------------------------------
-       NORMAL MODE
-    ----------------------------------------------------- */
-
-    else {
-
-        const baseDelta =
-            Math.abs(
-                targetBase - startBase
-            );
-
-
-        const jointDelta =
-            Math.abs(
-                targetJoint - startJoint
-            );
-
-
-        const maxDelta =
-            Math.max(
-                baseDelta,
-                jointDelta
-            );
-
-
-        const steps =
-            Math.max(
-                1,
-                Math.ceil(
-                    maxDelta / 0.5
-                )
-            );
-
-
-        for (
-            let i = 1;
-            i <= steps;
-            i++
-        ) {
-
-            if (shouldAbort)
-                return;
-
-
-            const t =
-                i / steps;
-
-
-            const interpBase =
-                startBase +
-                (targetBase - startBase) * t;
-
-
-            const interpJoint =
-                startJoint +
-                (targetJoint - startJoint) * t;
-
-
-            await sendPacket(
-                interpBase,
-                interpJoint,
-                penState
-            );
-
-
-            await new Promise(
-                r => setTimeout(
-                    r,
-                    stepDelayMs
-                )
-            );
-
-        }
-
-    }
-
-}
-
-
-/* =========================================================
-   MANUAL SLIDERS
-========================================================= */
-
-async function handleSliderInput() {
-
-    const base =
-        parseFloat(
-            document.getElementById(
-                "baseSlider"
-            ).value
+    const baseDistance =
+        Math.abs(
+            targetBase -
+            startBase
+        );
+
+    const jointDistance =
+        Math.abs(
+            targetJoint -
+            startJoint
         );
 
 
-    const joint =
-        parseFloat(
-            document.getElementById(
-                "jointSlider"
-            ).value
+    const maxDistance =
+        Math.max(
+            baseDistance,
+            jointDistance
         );
 
 
-    document.getElementById(
-        "baseVal"
-    ).innerText = base;
+    const steps =
+        Math.max(
+            1,
+            Math.ceil(
+                maxDistance
+            )
+        );
 
 
-    document.getElementById(
-        "jointVal"
-    ).innerText = joint;
+    for (
+        let i = 1;
+        i <= steps;
+        i++
+    ) {
+
+        if (shouldAbort)
+            return;
 
 
-    if (
-        isSending ||
-        !rxCharacteristic
-    )
-        return;
+        const t =
+            i / steps;
 
 
-    try {
+        const base =
+            startBase +
+            (
+                targetBase -
+                startBase
+            ) * t;
 
-        isSending = true;
+
+        const joint =
+            startJoint +
+            (
+                targetJoint -
+                startJoint
+            ) * t;
 
 
         await sendPacket(
             base,
             joint,
-            currentPenState
+            penState
         );
 
-    }
 
-    catch (err) {
-
-        console.error(
-            "BLE Send Error:",
-            err
+        await sleep(
+            delay
         );
-
     }
-
-    finally {
-
-        isSending = false;
-
-    }
-
 }
 
 
 /* =========================================================
-   PEN CONTROL
+   SLEEP
 ========================================================= */
 
-function togglePen(state) {
+function sleep(ms) {
 
-    currentPenState = state;
-
-    handleSliderInput();
-
+    return new Promise(
+        resolve =>
+            setTimeout(
+                resolve,
+                ms
+            )
+    );
 }
 
 
 /* =========================================================
-   INVERSE KINEMATICS
+   LOAD SVG BUTTON
 ========================================================= */
 
-function predictAngles(x, y) {
+loadSvgBtn.addEventListener(
+    "click",
+    function() {
 
-    const L1 =
-        parseFloat(
-            document.getElementById(
-                "L1"
-            ).value
-        ) || 120;
+        svgFileInput.click();
 
-
-    const L2 =
-        parseFloat(
-            document.getElementById(
-                "L2"
-            ).value
-        ) || 220;
+    }
+);
 
 
-    const BASE_OFF =
-        parseFloat(
-            document.getElementById(
-                "baseOff"
-            ).value
-        ) || 65;
+svgFileInput.addEventListener(
+    "change",
+    handleSVGUpload
+);
 
 
-    const JOINT_OFF =
-        parseFloat(
-            document.getElementById(
-                "jointOff"
-            ).value
-        ) || 175;
+/* =========================================================
+   SVG UPLOAD
+========================================================= */
+
+function handleSVGUpload(event) {
+
+    const file =
+        event.target.files[0];
+
+    if (!file)
+        return;
 
 
-    let dist2 =
-        x * x +
-        y * y;
+    log(
+        "Loading SVG: " +
+        file.name
+    );
 
 
-    let dist =
-        Math.sqrt(dist2);
+    const reader =
+        new FileReader();
 
 
-    /* -----------------------------------------------------
-       TOO FAR AWAY
-    ----------------------------------------------------- */
+    reader.onload =
+        function(e) {
+
+            parseSVGData(
+                e.target.result
+            );
+
+        };
+
+
+    reader.onerror =
+        function() {
+
+            alert(
+                "Could not read SVG file."
+            );
+
+        };
+
+
+    reader.readAsText(file);
+}
+
+
+/* =========================================================
+   SVG PARSER
+========================================================= */
+
+function parseSVGData(svgText) {
+
+    const parser =
+        new DOMParser();
+
+
+    const doc =
+        parser.parseFromString(
+            svgText,
+            "image/svg+xml"
+        );
+
+
+    const parserError =
+        doc.querySelector(
+            "parsererror"
+        );
+
+
+    if (parserError) {
+
+        alert(
+            "Invalid SVG file."
+        );
+
+        return;
+    }
+
+
+    parsedPaths = [];
+    originalPaths = [];
+
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+
+    function addPath(points) {
+
+        if (
+            !points ||
+            points.length === 0
+        )
+            return;
+
+
+        parsedPaths.push({
+            points: points
+        });
+
+
+        points.forEach(
+            p => {
+
+                minX =
+                    Math.min(
+                        minX,
+                        p.x
+                    );
+
+                maxX =
+                    Math.max(
+                        maxX,
+                        p.x
+                    );
+
+                minY =
+                    Math.min(
+                        minY,
+                        p.y
+                    );
+
+                maxY =
+                    Math.max(
+                        maxY,
+                        p.y
+                    );
+            }
+        );
+    }
+
+
+    /* =====================================================
+       PATH
+    ===================================================== */
+
+    doc.querySelectorAll(
+        "path"
+    ).forEach(
+        el => {
+
+            const d =
+                el.getAttribute(
+                    "d"
+                );
+
+            if (!d)
+                return;
+
+
+            const path =
+                document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    "path"
+                );
+
+
+            path.setAttribute(
+                "d",
+                d
+            );
+
+
+            let length;
+
+            try {
+
+                length =
+                    path.getTotalLength();
+
+            }
+
+            catch {
+
+                return;
+
+            }
+
+
+            const samples =
+                Math.max(
+                    20,
+                    Math.min(
+                        500,
+                        Math.ceil(
+                            length / 2
+                        )
+                    )
+                );
+
+
+            const points = [];
+
+
+            for (
+                let i = 0;
+                i <= samples;
+                i++
+            ) {
+
+                const point =
+                    path.getPointAtLength(
+                        length *
+                        i /
+                        samples
+                    );
+
+
+                points.push({
+                    x: point.x,
+                    y: point.y
+                });
+
+            }
+
+
+            addPath(points);
+
+        }
+    );
+
+
+    /* =====================================================
+       POLYLINE / POLYGON
+    ===================================================== */
+
+    doc.querySelectorAll(
+        "polyline, polygon"
+    ).forEach(
+        el => {
+
+            const value =
+                el.getAttribute(
+                    "points"
+                );
+
+            if (!value)
+                return;
+
+
+            const numbers =
+                value
+                    .trim()
+                    .split(
+                        /[\s,]+/
+                    )
+                    .map(Number);
+
+
+            const points = [];
+
+
+            for (
+                let i = 0;
+                i + 1 < numbers.length;
+                i += 2
+            ) {
+
+                if (
+                    Number.isFinite(
+                        numbers[i]
+                    ) &&
+                    Number.isFinite(
+                        numbers[i + 1]
+                    )
+                ) {
+
+                    points.push({
+                        x: numbers[i],
+                        y: numbers[i + 1]
+                    });
+
+                }
+
+            }
+
+
+            addPath(points);
+
+        }
+    );
+
+
+    /* =====================================================
+       LINE
+    ===================================================== */
+
+    doc.querySelectorAll(
+        "line"
+    ).forEach(
+        el => {
+
+            const x1 =
+                Number(
+                    el.getAttribute("x1")
+                ) || 0;
+
+            const y1 =
+                Number(
+                    el.getAttribute("y1")
+                ) || 0;
+
+            const x2 =
+                Number(
+                    el.getAttribute("x2")
+                ) || 0;
+
+            const y2 =
+                Number(
+                    el.getAttribute("y2")
+                ) || 0;
+
+
+            addPath([
+                {
+                    x: x1,
+                    y: y1
+                },
+                {
+                    x: x2,
+                    y: y2
+                }
+            ]);
+
+        }
+    );
+
+
+    /* =====================================================
+       RECT
+    ===================================================== */
+
+    doc.querySelectorAll(
+        "rect"
+    ).forEach(
+        el => {
+
+            const x =
+                Number(
+                    el.getAttribute("x")
+                ) || 0;
+
+            const y =
+                Number(
+                    el.getAttribute("y")
+                ) || 0;
+
+            const width =
+                Number(
+                    el.getAttribute("width")
+                ) || 0;
+
+            const height =
+                Number(
+                    el.getAttribute("height")
+                ) || 0;
+
+
+            addPath([
+                { x: x, y: y },
+                { x: x + width, y: y },
+                {
+                    x: x + width,
+                    y: y + height
+                },
+                {
+                    x: x,
+                    y: y + height
+                },
+                { x: x, y: y }
+            ]);
+
+        }
+    );
+
+
+    /* =====================================================
+       CIRCLE
+    ===================================================== */
+
+    doc.querySelectorAll(
+        "circle"
+    ).forEach(
+        el => {
+
+            const cx =
+                Number(
+                    el.getAttribute("cx")
+                ) || 0;
+
+            const cy =
+                Number(
+                    el.getAttribute("cy")
+                ) || 0;
+
+            const r =
+                Number(
+                    el.getAttribute("r")
+                ) || 0;
+
+
+            const points = [];
+
+            const segments = 100;
+
+
+            for (
+                let i = 0;
+                i <= segments;
+                i++
+            ) {
+
+                const angle =
+                    2 *
+                    Math.PI *
+                    i /
+                    segments;
+
+
+                points.push({
+
+                    x:
+                        cx +
+                        r *
+                        Math.cos(angle),
+
+                    y:
+                        cy +
+                        r *
+                        Math.sin(angle)
+
+                });
+
+            }
+
+
+            addPath(points);
+
+        }
+    );
+
 
     if (
-        dist >
-        L1 + L2 - 2
+        parsedPaths.length === 0
     ) {
 
-        const scale =
-            (L1 + L2 - 2) /
-            dist;
+        alert(
+            "No drawable SVG elements found."
+        );
+
+        return;
+    }
 
 
-        x *= scale;
-        y *= scale;
+    const width =
+        maxX -
+        minX ||
+        1;
+
+    const height =
+        maxY -
+        minY ||
+        1;
 
 
-        dist2 =
-            x * x +
-            y * y;
+    originalPaths =
+        parsedPaths.map(
+            path => ({
+
+                points:
+                    path.points.map(
+                        p => ({
+
+                            x:
+                                p.x -
+                                minX,
+
+                            y:
+                                p.y -
+                                minY
+
+                        })
+                    )
+
+            })
+        );
+
+
+    const scale =
+        Math.min(
+            120 / width,
+            120 / height
+        );
+
+
+    document.getElementById(
+        "svgScale"
+    ).value =
+        Math.max(
+            0.05,
+            scale
+        ).toFixed(2);
+
+
+    document.getElementById(
+        "svgX"
+    ).value = 60;
+
+
+    document.getElementById(
+        "svgY"
+    ).value = 60;
+
+
+    updateSVGTransform();
+
+
+    document.getElementById(
+        "plotStatusText"
+    ).innerText =
+        `Loaded ${parsedPaths.length} stroke(s)`;
+
+
+    if (rxCharacteristic) {
+        startPlotBtn.disabled = false;
+    }
+
+
+    log(
+        `SVG loaded: ${parsedPaths.length} stroke(s)`
+    );
+}
+
+
+/* =========================================================
+   SVG TRANSFORM
+========================================================= */
+
+document.getElementById(
+    "svgX"
+).addEventListener(
+    "input",
+    updateSVGTransform
+);
+
+
+document.getElementById(
+    "svgY"
+).addEventListener(
+    "input",
+    updateSVGTransform
+);
+
+
+document.getElementById(
+    "svgScale"
+).addEventListener(
+    "input",
+    updateSVGTransform
+);
+
+
+function updateSVGTransform() {
+
+    if (
+        originalPaths.length === 0
+    )
+        return;
+
+
+    const x =
+        Number(
+            document.getElementById(
+                "svgX"
+            ).value
+        ) || 0;
+
+
+    const y =
+        Number(
+            document.getElementById(
+                "svgY"
+            ).value
+        ) || 0;
+
+
+    const scale =
+        Number(
+            document.getElementById(
+                "svgScale"
+            ).value
+        ) || 1;
+
+
+    parsedPaths =
+        originalPaths.map(
+            path => ({
+
+                points:
+                    path.points.map(
+                        p => ({
+
+                            x:
+                                p.x *
+                                scale +
+                                x,
+
+                            y:
+                                p.y *
+                                scale +
+                                y
+
+                        })
+                    )
+
+            })
+        );
+
+
+    renderCanvasPreview();
+}
+
+
+/* =========================================================
+   CENTER SVG
+========================================================= */
+
+centerSvgBtn.addEventListener(
+    "click",
+    centerSVG
+);
+
+
+function centerSVG() {
+
+    if (
+        originalPaths.length === 0
+    ) {
+
+        alert(
+            "Load an SVG first."
+        );
+
+        return;
+    }
+
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+
+    originalPaths.forEach(
+        path => {
+
+            path.points.forEach(
+                p => {
+
+                    minX =
+                        Math.min(
+                            minX,
+                            p.x
+                        );
+
+                    maxX =
+                        Math.max(
+                            maxX,
+                            p.x
+                        );
+
+                    minY =
+                        Math.min(
+                            minY,
+                            p.y
+                        );
+
+                    maxY =
+                        Math.max(
+                            maxY,
+                            p.y
+                        );
+
+                }
+            );
+
+        }
+    );
+
+
+    const width =
+        maxX - minX;
+
+    const height =
+        maxY - minY;
+
+
+    const scale =
+        Math.min(
+            260 / width,
+            260 / height
+        );
+
+
+    document.getElementById(
+        "svgScale"
+    ).value =
+        scale.toFixed(2);
+
+
+    document.getElementById(
+        "svgX"
+    ).value =
+        (
+            20 -
+            minX * scale
+        ).toFixed(1);
+
+
+    document.getElementById(
+        "svgY"
+    ).value =
+        (
+            20 -
+            minY * scale
+        ).toFixed(1);
+
+
+    updateSVGTransform();
+
+
+    log("SVG centered.");
+}
+
+
+/* =========================================================
+   PREVIEW
+========================================================= */
+
+function renderCanvasPreview(
+    activePoint = null
+) {
+
+    const canvas =
+        document.getElementById(
+            "previewCanvas"
+        );
+
+    const ctx =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    if (
+        parsedPaths.length === 0
+    )
+        return;
+
+
+    ctx.strokeStyle =
+        "#007aff";
+
+    ctx.lineWidth = 2;
+
+
+    parsedPaths.forEach(
+        path => {
+
+            if (
+                path.points.length === 0
+            )
+                return;
+
+
+            ctx.beginPath();
+
+
+            path.points.forEach(
+                (p, index) => {
+
+                    const px =
+                        p.x * 0.8;
+
+                    const py =
+                        canvas.height -
+                        p.y * 0.8;
+
+
+                    if (index === 0) {
+
+                        ctx.moveTo(
+                            px,
+                            py
+                        );
+
+                    } else {
+
+                        ctx.lineTo(
+                            px,
+                            py
+                        );
+
+                    }
+
+                }
+            );
+
+
+            ctx.stroke();
+
+        }
+    );
+
+
+    if (activePoint) {
+
+        ctx.fillStyle =
+            "#ff3b30";
+
+
+        ctx.beginPath();
+
+
+        ctx.arc(
+            activePoint.x * 0.8,
+            canvas.height -
+                activePoint.y * 0.8,
+            5,
+            0,
+            Math.PI * 2
+        );
+
+
+        ctx.fill();
+
+    }
+}
+
+
+/* =========================================================
+   START PLOT
+========================================================= */
+
+startPlotBtn.addEventListener(
+    "click",
+    startPlotting
+);
+
+
+async function startPlotting() {
+
+    if (!rxCharacteristic) {
+
+        alert(
+            "Connect Bluetooth first!"
+        );
+
+        return;
+    }
+
+
+    if (
+        parsedPaths.length === 0
+    ) {
+
+        alert(
+            "Load an SVG first!"
+        );
+
+        return;
+    }
+
+
+    if (isPlotting)
+        return;
+
+
+    isPlotting = true;
+    shouldAbort = false;
+
+
+    startPlotBtn.disabled = true;
+    stopPlotBtn.disabled = false;
+
+
+    const delay =
+        Number(
+            document.getElementById(
+                "lerpDelayInput"
+            ).value
+        ) || 40;
+
+
+    let totalPoints = 0;
+
+
+    parsedPaths.forEach(
+        path => {
+
+            totalPoints +=
+                path.points.length;
+
+        }
+    );
+
+
+    let completed = 0;
+
+
+    log("Starting plot...");
+
+
+    try {
+
+        for (
+            let pathIndex = 0;
+            pathIndex < parsedPaths.length;
+            pathIndex++
+        ) {
+
+            if (shouldAbort)
+                break;
+
+
+            const path =
+                parsedPaths[pathIndex];
+
+
+            if (
+                path.points.length === 0
+            )
+                continue;
+
+
+            /* =========================================
+               MOVE TO START WITH PEN UP
+            ========================================= */
+
+            const first =
+                path.points[0];
+
+
+            const startAngles =
+                predictAngles(
+                    first.x,
+                    first.y
+                );
+
+
+            await lerpMove(
+                startAngles.base,
+                startAngles.joint,
+                0,
+                delay
+            );
+
+
+            if (shouldAbort)
+                break;
+
+
+            await sleep(250);
+
+
+            /* =========================================
+               PEN DOWN
+            ========================================= */
+
+            currentPenState = 1;
+
+
+            await sendPacket(
+                startAngles.base,
+                startAngles.joint,
+                1
+            );
+
+
+            await sleep(150);
+
+
+            /* =========================================
+               DRAW
+            ========================================= */
+
+            for (
+                let i = 0;
+                i < path.points.length;
+                i++
+            ) {
+
+                if (shouldAbort)
+                    break;
+
+
+                const point =
+                    path.points[i];
+
+
+                const angles =
+                    predictAngles(
+                        point.x,
+                        point.y
+                    );
+
+
+                await lerpMove(
+                    angles.base,
+                    angles.joint,
+                    1,
+                    delay
+                );
+
+
+                completed++;
+
+
+                const percent =
+                    Math.round(
+                        completed /
+                        totalPoints *
+                        100
+                    );
+
+
+                document.getElementById(
+                    "plotProgress"
+                ).style.width =
+                    percent + "%";
+
+
+                document.getElementById(
+                    "plotStatusText"
+                ).innerText =
+                    `Plotting... ${percent}%`;
+
+
+                renderCanvasPreview(
+                    point
+                );
+
+            }
+
+
+            if (shouldAbort)
+                break;
+
+
+            /* =========================================
+               PEN UP
+            ========================================= */
+
+            const last =
+                path.points[
+                    path.points.length - 1
+                ];
+
+
+            const endAngles =
+                predictAngles(
+                    last.x,
+                    last.y
+                );
+
+
+            currentPenState = 0;
+
+
+            await sendPacket(
+                endAngles.base,
+                endAngles.joint,
+                0
+            );
+
+
+            await sleep(150);
+        }
+
+
+        if (shouldAbort) {
+
+            document.getElementById(
+                "plotStatusText"
+            ).innerText =
+                "Plot aborted.";
+
+            log("Plot aborted.");
+
+        } else {
+
+            document.getElementById(
+                "plotStatusText"
+            ).innerText =
+                "Done!";
+
+            document.getElementById(
+                "plotProgress"
+            ).style.width =
+                "100%";
+
+            log("Plot complete.");
+
+        }
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        document.getElementById(
+            "plotStatusText"
+        ).innerText =
+            "Plot error.";
+
+        log(
+            "PLOT ERROR: " +
+            error.message
+        );
+
+        alert(
+            "Plot error:\n\n" +
+            error.message
+        );
 
     }
 
 
-    /* -----------------------------------------------------
-       ELBOW ANGLE
-    ----------------------------------------------------- */
-
-    let cosJ =
-        (
-            dist2 -
-            L1 * L1 -
-            L2 * L2
-        ) /
-        (
-            2 * L1 * L2
-        );
+    currentPenState = 0;
 
 
-    cosJ =
-        Math.max(
-            -1,
-            Math.min(
+    isPlotting = false;
+
+
+    startPlotBtn.disabled =
+        !rxCharacteristic ||
+        parsedPaths.length === 0;
+
+
+    stopPlotBtn.disabled =
+        true;
+
+
+    renderCanvasPreview();
+}
+
+
+/* =========================================================
+   ABORT
+========================================================= */
+
+stopPlotBtn.addEventListener(
+    "click",
+    stopPlotting
+);
+
+
+function stopPlotting() {
+
+    shouldAbort = true;
+
+    log("Abort requested.");
+
+    currentPenState = 0;
+
+    sendPacket(
+        currentBaseAngle,
+        currentJointAngle,
+        0
+    );
+
+}
+
+
+/* =========================================================
+   CONNECT BUTTON
+========================================================= */
+
+connectBtn.addEventListener(
+    "click",
+    connectBLE
+);
+
+
+/* =========================================================
+   INITIAL STATE
+========================================================= */
+
+baseVal.innerText =
+    baseSlider.value;
+
+jointVal.innerText =
+    jointSlider.value;
+
+log("Controller loaded.");
+
+if (!navigator.bluetooth) {
+
+    log(
+        "WARNING: Web Bluetooth is unavailable."
+    );
+
+}
+
+</script></body>
+</html>
