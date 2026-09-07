@@ -22,6 +22,7 @@
         th, td { border: 1px solid #333; padding: 8px; text-align: center; }
         th { background: #2a2a2a; }
         td input { width: 90%; padding: 4px; margin: 0; }
+        .prediction-box { background: #2a2a2a; border-left: 4px solid #007aff; padding: 10px; margin-top: 10px; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -91,7 +92,7 @@
         <button onclick="trainNetwork()" class="btn-green" style="margin-top: 15px;">Train Neural Net</button>
     </div>
 
-    <!-- Movement Target -->
+    <!-- Movement Target & Prediction Display -->
     <div class="card">
         <h3>Move to Cartesian (X, Y)</h3>
         <div class="row">
@@ -99,6 +100,12 @@
             <input type="number" id="targetY" placeholder="Target Y (mm)">
         </div>
         <button onclick="moveToTarget()">Move via NN Model</button>
+
+        <!-- Dynamic Output Readout -->
+        <div id="predictionDisplay" class="prediction-box" style="display: none;">
+            <strong>Target Target Position:</strong> X: <span id="outX">0</span> mm, Y: <span id="outY">0</span> mm<br>
+            <strong>Calculated Angles:</strong> Base: <span id="outBase">0</span>°, Joint: <span id="outJoint">0</span>°
+        </div>
     </div>
 
 <script>
@@ -108,11 +115,11 @@ const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 let rxCharacteristic = null;
 let bleDevice = null;
 let dataset = [];
-let net = new brain.NeuralNetwork({ hiddenLayers: [16, 16] });
+let net = null;
 let isTrained = false;
 let currentPenState = 0;
 
-// Load local cache on page launch
+// Load local dataset cache on boot
 window.onload = function() {
     const cached = localStorage.getItem("scara_local_dataset");
     if (cached) {
@@ -120,17 +127,15 @@ window.onload = function() {
             dataset = JSON.parse(cached);
             renderTable();
         } catch (e) {
-            console.error("Error reading cached local dataset:", e);
+            console.error("Error loading cached local dataset:", e);
         }
     }
 };
 
-// Save dataset cache locally
 function saveLocalCache() {
     localStorage.setItem("scara_local_dataset", JSON.stringify(dataset));
 }
 
-// Export dataset to downloadable .json file
 function exportJSON() {
     readTableData();
     if (dataset.length === 0) {
@@ -147,7 +152,6 @@ function exportJSON() {
     URL.revokeObjectURL(url);
 }
 
-// Import dataset from user-selected .json file
 function importJSON(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -169,7 +173,7 @@ function importJSON(event) {
         }
     };
     reader.readAsText(file);
-    event.target.value = ""; // Reset input
+    event.target.value = "";
 }
 
 function renderTable() {
@@ -236,18 +240,29 @@ function readTableData() {
 function trainNetwork() {
     readTableData();
     if (dataset.length < 3) {
-        alert("Add at least 3 calibration points first!");
+        alert("Add at least 3-6 calibration points across your drawing area first!");
         return;
     }
+
+    // Configured with smaller hidden layers for tighter mapping accuracy on small datasets
+    net = new brain.NeuralNetwork({ 
+        hiddenLayers: [8, 8],
+        activation: 'sigmoid'
+    });
 
     const formattedData = dataset.map(p => ({
         input: { x: p.x / 300, y: p.y / 300 },
         output: { base: p.base / 180, joint: p.joint / 180 }
     }));
 
-    net.train(formattedData, { iterations: 3000, errorThresh: 0.005 });
+    net.train(formattedData, { 
+        iterations: 10000, 
+        errorThresh: 0.001,
+        learningRate: 0.3
+    });
+
     isTrained = true;
-    alert("Neural Network trained!");
+    alert("Neural Network trained successfully!");
 }
 
 async function connectBLE() {
@@ -295,17 +310,31 @@ function sendManualCommand() {
 }
 
 function moveToTarget() {
-    if (!isTrained) {
+    if (!isTrained || !net) {
         alert("Train the Neural Network model first!");
         return;
     }
     const tx = parseFloat(document.getElementById("targetX").value);
     const ty = parseFloat(document.getElementById("targetY").value);
 
+    if (isNaN(tx) || isNaN(ty)) {
+        alert("Please enter valid Target X and Y values!");
+        return;
+    }
+
+    // Run prediction
     const output = net.run({ x: tx / 300, y: ty / 300 });
     const predBase = Math.round(output.base * 180);
     const predJoint = Math.round(output.joint * 180);
 
+    // Update readout UI
+    document.getElementById("outX").innerText = tx;
+    document.getElementById("outY").innerText = ty;
+    document.getElementById("outBase").innerText = predBase;
+    document.getElementById("outJoint").innerText = predJoint;
+    document.getElementById("predictionDisplay").style.display = "block";
+
+    // Transmit over Bluetooth
     sendPacket(predBase, predJoint, currentPenState);
 }
 </script>
