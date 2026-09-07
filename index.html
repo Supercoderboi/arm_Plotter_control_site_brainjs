@@ -89,7 +89,7 @@
                 </tbody>
             </table>
         </div>
-        <button onclick="trainNetwork()" class="btn-green" style="margin-top: 15px;">Train Neural Net</button>
+        <button onclick="Network()" class="btn-green" style="margin-top: 15px;"> Neural Net</button>
     </div>
 
     <!-- Movement Target & Prediction Display -->
@@ -116,7 +116,7 @@ let rxCharacteristic = null;
 let bleDevice = null;
 let dataset = [];
 let net = null;
-let isTrained = false;
+let ised = false;
 let currentPenState = 0;
 
 // Load local dataset cache on boot
@@ -244,25 +244,37 @@ function trainNetwork() {
         return;
     }
 
-    // Configured with smaller hidden layers for tighter mapping accuracy on small datasets
-    net = new brain.NeuralNetwork({ 
-        hiddenLayers: [8, 8],
-        activation: 'sigmoid'
-    });
-
     const formattedData = dataset.map(p => ({
         input: { x: p.x / 300, y: p.y / 300 },
         output: { base: p.base / 180, joint: p.joint / 180 }
     }));
 
-    net.train(formattedData, { 
-        iterations: 10000, 
-        errorThresh: 0.001,
-        learningRate: 0.3
-    });
+    let bestNet = null;
+    let lowestError = Infinity;
+    const runs = 5; // Train 5 separate times and pick the best one
 
+    for (let i = 0; i < runs; i++) {
+        let tempNet = new brain.NeuralNetwork({ 
+            hiddenLayers: [8, 8],
+            activation: 'sigmoid'
+        });
+
+        let stats = tempNet.train(formattedData, { 
+            iterations: 8000, 
+            errorThresh: 0.0005,
+            learningRate: 0.3
+        });
+
+        // Track the run with the absolute lowest error
+        if (stats.error < lowestError) {
+            lowestError = stats.error;
+            bestNet = tempNet;
+        }
+    }
+
+    net = bestNet;
     isTrained = true;
-    alert("Neural Network trained successfully!");
+    alert(`Trained ${runs} models! Kept the best one with error: ${lowestError.toFixed(5)}`);
 }
 
 async function connectBLE() {
