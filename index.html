@@ -119,6 +119,14 @@ let isTrained = false;
 let currentPenState = 0;
 let isSending = false;
 
+// Global Min-Max Normalization Metadata
+let normBounds = {
+    minX: 0, maxX: 1,
+    minY: 0, maxY: 1,
+    minBase: 0, maxBase: 180,
+    minJoint: 0, maxJoint: 180
+};
+
 // Load local dataset cache on launch
 window.onload = function() {
     const cached = localStorage.getItem("scara_local_dataset");
@@ -237,7 +245,31 @@ function readTableData() {
     saveLocalCache();
 }
 
-// Multi-Run Ensemble Training (Best-of-20)
+// Compute Dynamic Min-Max Normalization Limits
+function updateNormalizationBounds() {
+    const xVals = dataset.map(p => p.x);
+    const yVals = dataset.map(p => p.y);
+    const baseVals = dataset.map(p => p.base);
+    const jointVals = dataset.map(p => p.joint);
+
+    normBounds.minX = Math.min(...xVals);
+    normBounds.maxX = Math.max(...xVals);
+    normBounds.minY = Math.min(...yVals);
+    normBounds.maxY = Math.max(...yVals);
+    
+    normBounds.minBase = Math.min(...baseVals);
+    normBounds.maxBase = Math.max(...baseVals);
+    normBounds.minJoint = Math.min(...jointVals);
+    normBounds.maxJoint = Math.max(...jointVals);
+
+    // Prevent divide-by-zero errors if min equals max
+    if (normBounds.minX === normBounds.maxX) normBounds.maxX += 1;
+    if (normBounds.minY === normBounds.maxY) normBounds.maxY += 1;
+    if (normBounds.minBase === normBounds.maxBase) normBounds.maxBase += 1;
+    if (normBounds.minJoint === normBounds.maxJoint) normBounds.maxJoint += 1;
+}
+
+// Multi-Run Ensemble Training (Best-of-20) with Dynamic Normalization
 function trainNetwork() {
     readTableData();
     if (dataset.length < 3) {
@@ -245,9 +277,18 @@ function trainNetwork() {
         return;
     }
 
+    updateNormalizationBounds();
+
+    // Map dataset dynamically onto [0, 1] range based on dataset limits
     const formattedData = dataset.map(p => ({
-        input: { x: p.x / 300, y: p.y / 300 },
-        output: { base: p.base / 180, joint: p.joint / 180 }
+        input: { 
+            x: (p.x - normBounds.minX) / (normBounds.maxX - normBounds.minX), 
+            y: (p.y - normBounds.minY) / (normBounds.maxY - normBounds.minY) 
+        },
+        output: { 
+            base: (p.base - normBounds.minBase) / (normBounds.maxBase - normBounds.minBase), 
+            joint: (p.joint - normBounds.minJoint) / (normBounds.maxJoint - normBounds.minJoint) 
+        }
     }));
 
     let bestNet = null;
@@ -256,14 +297,14 @@ function trainNetwork() {
 
     for (let i = 0; i < runs; i++) {
         let tempNet = new brain.NeuralNetwork({ 
-            hiddenLayers: [8, 8],
-            activation: 'sigmoid'
+            hiddenLayers: [12, 12],
+            activation: 'leaky-relu'
         });
 
         let stats = tempNet.train(formattedData, { 
-            iterations: 8000, 
-            errorThresh: 0.0005,
-            learningRate: 0.3
+            iterations: 10000, 
+            errorThresh: 0.0001,
+            learningRate: 0.1
         });
 
         if (stats.error < lowestError) {
@@ -274,7 +315,7 @@ function trainNetwork() {
 
     net = bestNet;
     isTrained = true;
-    alert(`Trained ${runs} models successfully!\nKept best model with error: ${lowestError.toFixed(6)}`);
+    alert(`Trained ${runs} models with Dynamic Min-Max scaling!\nBest model error: ${lowestError.toFixed(6)}`);
 }
 
 async function connectBLE() {
@@ -339,10 +380,16 @@ function moveToTarget() {
         return;
     }
 
+    // Dynamic Normalization for Target Input
+    const normX = (tx - normBounds.minX) / (normBounds.maxX - normBounds.minX);
+    const normY = (ty - normBounds.minY) / (normBounds.maxY - normBounds.minY);
+
     // Run prediction
-    const output = net.run({ x: tx / 300, y: ty / 300 });
-    const predBase = Math.round(output.base * 180);
-    const predJoint = Math.round(output.joint * 180);
+    const output = net.run({ x: normX, y: normY });
+
+    // Reverse Min-Max Scaling to recover actual angles
+    const predBase = Math.round(output.base * (normBounds.maxBase - normBounds.minBase) + normBounds.minBase);
+    const predJoint = Math.round(output.joint * (normBounds.maxJoint - normBounds.minJoint) + normBounds.minJoint);
 
     // Update readout UI
     document.getElementById("outX").innerText = tx;
