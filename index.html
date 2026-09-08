@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCARA Controller - Precision IK</title>
+    <title>SCARA Interactive Controller</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; background: #121212; color: #fff; }
         .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
@@ -12,12 +12,13 @@
         .btn-green { background: #34c759; }
         .btn-red { background: #ff3b30; }
         .btn-secondary { background: #5856d6; }
-        input[type="number"], input[type="text"] { width: calc(100% - 22px); padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #333; background: #2c2c2c; color: #fff; font-size: 16px; }
+        input[type="number"], input[type="text"], input[type="range"] { width: calc(100% - 22px); padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #333; background: #2c2c2c; color: #fff; font-size: 16px; }
         .row { display: flex; gap: 10px; }
         .status { font-weight: bold; color: #ff3b30; }
         .connected { color: #34c759; }
         .prediction-box { background: #2a2a2a; border-left: 4px solid #007aff; padding: 10px; margin-top: 10px; border-radius: 4px; }
-        canvas { background: #000; border-radius: 8px; width: 100%; height: auto; margin-top: 10px; border: 1px solid #333; }
+        canvas { background: #000; border-radius: 8px; width: 100%; height: auto; margin-top: 10px; border: 1px solid #333; cursor: grab; }
+        canvas:active { cursor: grabbing; }
         .progress-bar { background: #333; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 10px; }
         .progress-fill { background: #34c759; height: 100%; width: 0%; transition: width 0.1s; }
         .setting-label { font-size: 13px; color: #aaa; margin-top: 6px; }
@@ -25,7 +26,7 @@
 </head>
 <body>
 
-    <h2>SCARA Geometric IK Controller</h2>
+    <h2>SCARA Workspace & Interactive Controller</h2>
 
     <!-- BLE Connection -->
     <div class="card">
@@ -33,62 +34,45 @@
         <button id="connectBtn" onclick="connectBLE()">Connect Bluetooth</button>
     </div>
 
-    <!-- Arm Kinematics Configuration -->
+    <!-- Arm Kinematics Dimensions -->
     <div class="card">
         <h3>Calibrated Arm Dimensions</h3>
         <div class="row">
             <div>
                 <div class="setting-label">Link 1 (Base -> Joint)</div>
-                <input type="number" id="link1Length" value="114" step="0.01">
+                <input type="number" id="link1Length" value="114" step="0.01" onchange="renderCanvasPreview()">
             </div>
             <div>
                 <div class="setting-label">Link 2 (Joint -> Pen)</div>
-                <input type="number" id="link2Length" value="218.51" step="0.01">
+                <input type="number" id="link2Length" value="218.51" step="0.01" onchange="renderCanvasPreview()">
             </div>
         </div>
-        <div class="setting-label">Max Reach: <span id="maxReachText">332.51</span> mm</div>
     </div>
 
-    <!-- Manual Servo Control -->
+    <!-- Interactive Canvas & Positioning Engine -->
     <div class="card">
-        <h3>Manual Servo Control</h3>
-        <label>Base Angle (0-180): <span id="baseVal">90</span>°</label>
-        <input type="range" id="baseSlider" min="0" max="180" value="90" style="width: 100%;" oninput="handleSliderInput()">
-        
-        <label>Joint Angle (0-180): <span id="jointVal">45</span>°</label>
-        <input type="range" id="jointSlider" min="0" max="180" value="45" style="width: 100%;" oninput="handleSliderInput()">
-
-        <div class="row">
-            <button onclick="togglePen(1)">Pen DOWN</button>
-            <button onclick="togglePen(0)">Pen UP</button>
-        </div>
-    </div>
-
-    <!-- Single Movement Target (Geometric IK) -->
-    <div class="card">
-        <h3>Move to Cartesian (X, Y)</h3>
-        <div class="row">
-            <input type="number" id="targetX" placeholder="Target X (mm)">
-            <input type="number" id="targetY" placeholder="Target Y (mm)">
-        </div>
-        <button onclick="moveToTarget()">Move via Precise IK</button>
-
-        <div id="predictionDisplay" class="prediction-box" style="display: none;">
-            <strong>Target Position:</strong> X: <span id="outX">0</span> mm, Y: <span id="outY">0</span> mm<br>
-            <strong>Calculated IK Angles:</strong> Base: <span id="outBase">0</span>°, Joint: <span id="outJoint">0</span>°
-        </div>
-    </div>
-
-    <!-- File Plotting Engine (SVG & Raster PNG/JPG) -->
-    <div class="card">
-        <h3>Vector & Image Plotter</h3>
+        <h3>Interactive Image Drag & Scale Engine</h3>
         <div class="row">
             <button onclick="document.getElementById('svgFileInput').click()" class="btn-secondary">Load SVG Vector</button>
             <button onclick="document.getElementById('imgFileInput').click()" class="btn-secondary">Load Image (PNG/JPG)</button>
         </div>
         <input type="file" id="svgFileInput" accept=".svg" style="display:none;" onchange="handleSVGUpload(event)">
         <input type="file" id="imgFileInput" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
-        
+
+        <div class="setting-label">Scale Image Size: <span id="scaleValDisplay">1.0</span>x</div>
+        <input type="range" id="scaleSlider" min="0.1" max="3.0" step="0.05" value="1.0" oninput="handleScaleChange()">
+
+        <div class="row">
+            <button onclick="resetPosition()" class="btn-secondary">Center Image</button>
+        </div>
+
+        <canvas id="previewCanvas" width="400" height="400"></canvas>
+
+        <div id="coordInfo" class="prediction-box">
+            <strong>Bounding Box Center:</strong> X: <span id="centerXDisplay">0</span> mm, Y: <span id="centerYDisplay">150</span> mm<br>
+            <strong>Workspace Status:</strong> <span id="reachStatus" style="color: #34c759;">Inside Safe Reach</span>
+        </div>
+
         <div class="setting-label">Interpolation Delay per Sub-Step (ms)</div>
         <input type="number" id="lerpDelayInput" value="15" min="5" max="100">
 
@@ -101,9 +85,6 @@
             <div id="plotProgress" class="progress-fill"></div>
         </div>
         <div id="plotStatusText" style="margin-top: 5px; font-size: 14px;">No File Loaded</div>
-
-        <!-- Canvas Preview -->
-        <canvas id="previewCanvas" width="300" height="300"></canvas>
     </div>
 
 <script>
@@ -112,17 +93,32 @@ const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
 let rxCharacteristic = null;
 let bleDevice = null;
-let currentPenState = 0;
-let isSending = false;
 
-// Hardware Position Tracking
+// Hardware Tracking
 let currentBaseAngle = 90;
 let currentJointAngle = 45;
+let currentPenState = 0;
 
-// File Engine State
-let parsedPaths = [];
+// Path & Transformation State
+let rawParsedPaths = []; 
+let transformedPaths = [];
+let imgScale = 1.0;
+let imgOffsetX = 0;   // mm offset relative to origin
+let imgOffsetY = 150; // mm offset relative to origin
+
+// Interactive Canvas Dragging
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let initialOffsetX = 0, initialOffsetY = 0;
+
+// Plotter Engine State
 let isPlotting = false;
 let shouldAbort = false;
+
+window.onload = function() {
+    initCanvasEvents();
+    renderCanvasPreview();
+};
 
 async function connectBLE() {
     try {
@@ -130,7 +126,6 @@ async function connectBLE() {
             filters: [{ name: 'SCARA_Plotter' }],
             optionalServices: [SERVICE_UUID]
         });
-
         const server = await bleDevice.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
         rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_RX_UUID);
@@ -138,7 +133,7 @@ async function connectBLE() {
         document.getElementById("bleStatus").innerText = "Connected";
         document.getElementById("bleStatus").className = "status connected";
     } catch (error) {
-        alert("BLE Error: " + error);
+        alert("BLE Connection Error: " + error);
     }
 }
 
@@ -151,7 +146,6 @@ async function sendPacket(base, joint, pen) {
     currentJointAngle = joint;
 }
 
-// LERP Smoothed Movement Pipeline
 async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 15) {
     const startBase = currentBaseAngle;
     const startJoint = currentJointAngle;
@@ -159,7 +153,6 @@ async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 15) {
     const baseDelta = Math.abs(targetBase - startBase);
     const jointDelta = Math.abs(targetJoint - startJoint);
     const maxDelta = Math.max(baseDelta, jointDelta);
-
     const steps = Math.max(1, Math.ceil(maxDelta));
 
     for (let i = 1; i <= steps; i++) {
@@ -173,29 +166,6 @@ async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 15) {
     }
 }
 
-async function handleSliderInput() {
-    const base = parseFloat(document.getElementById("baseSlider").value);
-    const joint = parseFloat(document.getElementById("jointSlider").value);
-    document.getElementById("baseVal").innerText = base;
-    document.getElementById("jointVal").innerText = joint;
-
-    if (isSending || !rxCharacteristic) return;
-
-    try {
-        isSending = true;
-        await sendPacket(base, joint, currentPenState);
-    } catch (err) {
-        console.error("BLE Send Error:", err);
-    } finally {
-        isSending = false;
-    }
-}
-
-function togglePen(state) {
-    currentPenState = state;
-    handleSliderInput();
-}
-
 // ==================== GEOMETRIC INVERSE KINEMATICS ==================== //
 
 function calculateIK(x, y) {
@@ -205,63 +175,168 @@ function calculateIK(x, y) {
     const distanceSq = x * x + y * y;
     const distance = Math.sqrt(distanceSq);
 
-    // Reachability guard
     if (distance > (L1 + L2) || distance < Math.abs(L1 - L2)) {
         return null;
     }
 
-    // Law of Cosines
     const cosTheta2 = (distanceSq - L1 * L1 - L2 * L2) / (2 * L1 * L2);
     const clampedCos = Math.max(-1, Math.min(1, cosTheta2));
-    const theta2 = Math.acos(clampedCos); // Interior angle
+    const theta2 = Math.acos(clampedCos);
 
     const alpha = Math.atan2(y, x);
     const beta = Math.atan2(L2 * Math.sin(theta2), L1 + L2 * Math.cos(theta2));
 
-    // Standard Cartesian angles (in degrees)
     const rawBaseDeg = (alpha + beta) * (180 / Math.PI);
     const rawJointDeg = theta2 * (180 / Math.PI);
 
-    // Map to your physical servo polarities & home positions
-    // Base 90° = vertical (90° standard), inverted direction
     let baseDeg = 90 + (90 - rawBaseDeg);
-
-    // Joint 90° = perpendicular right, decreasing moves right
     let jointDeg = 180 - rawJointDeg;
 
-    // Clamp to physical 0-180 limits
     baseDeg = Math.max(0, Math.min(180, Math.round(baseDeg)));
     jointDeg = Math.max(0, Math.min(180, Math.round(jointDeg)));
 
     return { base: baseDeg, joint: jointDeg };
 }
 
-async function moveToTarget() {
-    const tx = parseFloat(document.getElementById("targetX").value);
-    const ty = parseFloat(document.getElementById("targetY").value);
+// ==================== INTERACTIVE POSITION & CANVAS ==================== //
 
-    if (isNaN(tx) || isNaN(ty)) {
-        alert("Please enter valid Target X and Y values!");
-        return;
-    }
+function initCanvasEvents() {
+    const canvas = document.getElementById("previewCanvas");
 
-    const angles = calculateIK(tx, ty);
-    if (!angles) {
-        alert("Target point is outside the reach of the SCARA arm!");
-        return;
-    }
+    canvas.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        initialOffsetX = imgOffsetX;
+        initialOffsetY = imgOffsetY;
+    });
 
-    document.getElementById("outX").innerText = tx;
-    document.getElementById("outY").innerText = ty;
-    document.getElementById("outBase").innerText = angles.base;
-    document.getElementById("outJoint").innerText = angles.joint;
-    document.getElementById("predictionDisplay").style.display = "block";
+    window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const L1 = parseFloat(document.getElementById("link1Length").value) || 114;
+        const L2 = parseFloat(document.getElementById("link2Length").value) || 218.51;
+        const totalReach = L1 + L2;
 
-    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 15;
-    await lerpMove(angles.base, angles.joint, currentPenState, delay);
+        const deltaX = e.clientX - dragStartX;
+        const deltaY = e.clientY - dragStartY;
+
+        const mmPerPixel = (totalReach * 2) / canvas.width;
+
+        imgOffsetX = initialOffsetX + deltaX * mmPerPixel;
+        imgOffsetY = initialOffsetY - deltaY * mmPerPixel; // Flip Y direction
+
+        applyTransformations();
+        renderCanvasPreview();
+    });
+
+    window.addEventListener("mouseup", () => { isDragging = false; });
 }
 
-// ==================== SVG & IMAGE PROCESSING ENGINE ==================== //
+function handleScaleChange() {
+    imgScale = parseFloat(document.getElementById("scaleSlider").value);
+    document.getElementById("scaleValDisplay").innerText = imgScale.toFixed(2);
+    applyTransformations();
+    renderCanvasPreview();
+}
+
+function resetPosition() {
+    imgOffsetX = 0;
+    imgOffsetY = 150;
+    imgScale = 1.0;
+    document.getElementById("scaleSlider").value = 1.0;
+    document.getElementById("scaleValDisplay").innerText = "1.0";
+    applyTransformations();
+    renderCanvasPreview();
+}
+
+function applyTransformations() {
+    if (rawParsedPaths.length === 0) return;
+
+    transformedPaths = rawParsedPaths.map(path => {
+        return {
+            points: path.points.map(pt => ({
+                x: pt.x * imgScale + imgOffsetX,
+                y: pt.y * imgScale + imgOffsetY
+            }))
+        };
+    });
+
+    document.getElementById("centerXDisplay").innerText = Math.round(imgOffsetX);
+    document.getElementById("centerYDisplay").innerText = Math.round(imgOffsetY);
+}
+
+function renderCanvasPreview(activePt = null) {
+    const canvas = document.getElementById("previewCanvas");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const L1 = parseFloat(document.getElementById("link1Length").value) || 114;
+    const L2 = parseFloat(document.getElementById("link2Length").value) || 218.51;
+    const reach = L1 + L2;
+    const innerMin = Math.abs(L1 - L2);
+
+    const scaleX = canvas.width / (reach * 2);
+    const scaleY = canvas.height / (reach * 1.2);
+    const originX = canvas.width / 2;
+    const originY = canvas.height - 20;
+
+    // Draw Physical Arm Workspace Boundary Rings
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(originX, originY, reach * scaleX, Math.PI, 0);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(originX, originY, innerMin * scaleX, Math.PI, 0);
+    ctx.stroke();
+
+    if (transformedPaths.length === 0) return;
+
+    let hasUnreachable = false;
+
+    // Render Loaded Path Segments
+    transformedPaths.forEach(path => {
+        ctx.beginPath();
+        path.points.forEach((pt, idx) => {
+            const cx = originX + (pt.x * scaleX);
+            const cy = originY - (pt.y * scaleY);
+
+            const dist = Math.sqrt(pt.x * pt.x + pt.y * pt.y);
+            if (dist > reach || dist < innerMin) {
+                hasUnreachable = true;
+            }
+
+            if (idx === 0) ctx.moveTo(cx, cy);
+            else ctx.lineTo(cx, cy);
+        });
+        ctx.strokeStyle = hasUnreachable ? "#ff3b30" : "#007aff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    });
+
+    // Update Status Warning Text
+    const statusText = document.getElementById("reachStatus");
+    if (hasUnreachable) {
+        statusText.innerText = "OUT OF REACH! Drag image inside physical boundary ring.";
+        statusText.style.color = "#ff3b30";
+    } else {
+        statusText.innerText = "Inside Safe Workspace Reach";
+        statusText.style.color = "#34c759";
+    }
+
+    // Draw active motion point marker
+    if (activePt) {
+        const curX = originX + (activePt.x * scaleX);
+        const curY = originY - (activePt.y * scaleY);
+        ctx.fillStyle = "#ffcc00";
+        ctx.beginPath();
+        ctx.arc(curX, curY, 6, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// ==================== FILE PARSER (SVG & IMAGE) ==================== //
 
 function handleSVGUpload(event) {
     const file = event.target.files[0];
@@ -269,7 +344,47 @@ function handleSVGUpload(event) {
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        parseSVGData(e.target.result);
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(e.target.result, "image/svg+xml");
+        const pathElements = doc.querySelectorAll("path, polygon, polyline, line, rect, circle");
+
+        rawParsedPaths = [];
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+        pathElements.forEach(el => {
+            let pathObj = { points: [] };
+            if (el.tagName.toLowerCase() === 'path') {
+                const d = el.getAttribute("d");
+                if (d) {
+                    const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    tempPath.setAttribute("d", d);
+                    const length = tempPath.getTotalLength();
+                    const step = Math.max(1, length / 40);
+
+                    for (let i = 0; i <= length; i += step) {
+                        const pt = tempPath.getPointAtLength(i);
+                        pathObj.points.push({ x: pt.x, y: pt.y });
+                        minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x);
+                        minY = Math.min(minY, pt.y); maxY = Math.max(maxY, pt.y);
+                    }
+                }
+            }
+            if (pathObj.points.length > 0) rawParsedPaths.push(pathObj);
+        });
+
+        // Center relative to (0,0)
+        const width = maxX - minX || 1;
+        const height = maxY - minY || 1;
+        rawParsedPaths.forEach(path => {
+            path.points = path.points.map(pt => ({
+                x: pt.x - minX - width / 2,
+                y: -(pt.y - minY - height / 2)
+            }));
+        });
+
+        applyTransformations();
+        renderCanvasPreview();
+        document.getElementById("plotStatusText").innerText = `Loaded SVG (${rawParsedPaths.length} paths). Drag image to reposition.`;
     };
     reader.readAsText(file);
 }
@@ -280,178 +395,77 @@ function handleImageUpload(event) {
 
     const img = new Image();
     img.onload = function() {
-        processImageToPaths(img);
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const maxDim = 100;
+
+        let w = img.width, h = img.height;
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const data = ctx.getImageData(0, 0, w, h).data;
+        let edges = new Uint8Array(w * h);
+
+        for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+                let idx = (y * w + x) * 4;
+                let val = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+                let valRight = (data[idx + 4] + data[idx + 5] + data[idx + 6]) / 3;
+                let diff = Math.abs(val - valRight);
+                edges[y * w + x] = diff > 30 ? 1 : 0;
+            }
+        }
+
+        rawParsedPaths = [];
+        let visited = new Uint8Array(w * h);
+
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                if (edges[y * w + x] && !visited[y * w + x]) {
+                    let pathObj = { points: [] };
+                    let currX = x, currY = y;
+
+                    while (currX >= 0 && currX < w && currY >= 0 && currY < h && edges[currY * w + currX] && !visited[currY * w + currX]) {
+                        visited[currY * w + currX] = 1;
+                        pathObj.points.push({ x: currX - w / 2, y: -(currY - h / 2) });
+
+                        let nextPt = false;
+                        for (let dy = -1; dy <= 1 && !nextPt; dy++) {
+                            for (let dx = -1; dx <= 1 && !nextPt; dx++) {
+                                let nx = currX + dx, ny = currY + dy;
+                                if (nx >= 0 && nx < w && ny >= 0 && ny < h && edges[ny * w + nx] && !visited[ny * w + nx]) {
+                                    currX = nx; currY = ny;
+                                    nextPt = true;
+                                }
+                            }
+                        }
+                        if (!nextPt) break;
+                    }
+                    if (pathObj.points.length > 3) rawParsedPaths.push(pathObj);
+                }
+            }
+        }
+
+        applyTransformations();
+        renderCanvasPreview();
+        document.getElementById("plotStatusText").innerText = `Image converted into ${rawParsedPaths.length} paths. Drag to place in reach.`;
     };
     img.src = URL.createObjectURL(file);
 }
 
-function processImageToPaths(img) {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const maxDim = 120; // Resolution limit for edge tracing
-    
-    let w = img.width;
-    let h = img.height;
-    if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-    else { w = Math.round((w * maxDim) / h); h = maxDim; }
-
-    canvas.width = w; canvas.height = h;
-    ctx.drawImage(img, 0, 0, w, h);
-
-    const imgData = ctx.getImageData(0, 0, w, h);
-    const data = imgData.data;
-
-    // Convert to Grayscale Edges
-    let edges = new Uint8Array(w * h);
-    for (let y = 1; y < h - 1; y++) {
-        for (let x = 1; x < w - 1; x++) {
-            let idx = (y * w + x) * 4;
-            let val = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-            let valRight = (data[idx + 4] + data[idx + 5] + data[idx + 6]) / 3;
-            let valDown = (data[((y + 1) * w + x) * 4] + data[((y + 1) * w + x) * 4 + 1] + data[((y + 1) * w + x) * 4 + 2]) / 3;
-            
-            let diff = Math.abs(val - valRight) + Math.abs(val - valDown);
-            edges[y * w + x] = diff > 40 ? 1 : 0;
-        }
-    }
-
-    parsedPaths = [];
-    let visited = new Uint8Array(w * h);
-
-    // Group adjacent edges into stroke paths
-    for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-            if (edges[y * w + x] && !visited[y * w + x]) {
-                let pathObj = { points: [] };
-                let currX = x, currY = y;
-                
-                while (currX >= 0 && currX < w && currY >= 0 && currY < h && edges[currY * w + currX] && !visited[currY * w + currX]) {
-                    visited[currY * w + currX] = 1;
-                    pathObj.points.push({ x: currX, y: currY });
-
-                    // Check neighbors
-                    let nextPt = false;
-                    for (let dy = -1; dy <= 1 && !nextPt; dy++) {
-                        for (let dx = -1; dx <= 1 && !nextPt; dx++) {
-                            let nx = currX + dx, ny = currY + dy;
-                            if (nx >= 0 && nx < w && ny >= 0 && ny < h && edges[ny * w + nx] && !visited[ny * w + nx]) {
-                                currX = nx; currY = ny;
-                                nextPt = true;
-                            }
-                        }
-                    }
-                    if (!nextPt) break;
-                }
-
-                if (pathObj.points.length > 3) {
-                    parsedPaths.push(pathObj);
-                }
-            }
-        }
-    }
-
-    scalePathsToWorkspace(0, w, 0, h);
-    document.getElementById("plotStatusText").innerText = `Image converted into ${parsedPaths.length} drawing paths.`;
-    renderCanvasPreview();
-}
-
-function parseSVGData(svgText) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgText, "image/svg+xml");
-    const pathElements = doc.querySelectorAll("path, polygon, polyline, line, rect, circle");
-
-    parsedPaths = [];
-    let rawMinX = Infinity, rawMaxX = -Infinity, rawMinY = Infinity, rawMaxY = -Infinity;
-
-    pathElements.forEach(el => {
-        let pathObj = { points: [] };
-        if (el.tagName.toLowerCase() === 'path') {
-            const d = el.getAttribute("d");
-            if (d) {
-                const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                tempPath.setAttribute("d", d);
-                const length = tempPath.getTotalLength();
-                const step = Math.max(1, length / 40);
-                
-                for (let i = 0; i <= length; i += step) {
-                    const pt = tempPath.getPointAtLength(i);
-                    pathObj.points.push({ x: pt.x, y: pt.y });
-                    rawMinX = Math.min(rawMinX, pt.x); rawMaxX = Math.max(rawMaxX, pt.x);
-                    rawMinY = Math.min(rawMinY, pt.y); rawMaxY = Math.max(rawMaxY, pt.y);
-                }
-            }
-        }
-        if (pathObj.points.length > 0) parsedPaths.push(pathObj);
-    });
-
-    scalePathsToWorkspace(rawMinX, rawMaxX, rawMinY, rawMaxY);
-    document.getElementById("plotStatusText").innerText = `Loaded SVG with ${parsedPaths.length} stroke segments.`;
-    renderCanvasPreview();
-}
-
-function scalePathsToWorkspace(minX, maxX, minY, maxY) {
-    const L1 = parseFloat(document.getElementById("link1Length").value) || 114;
-    const L2 = parseFloat(document.getElementById("link2Length").value) || 218.51;
-    const maxReach = (L1 + L2) * 0.75; // 75% max safety reach
-
-    const width = maxX - minX || 1;
-    const height = maxY - minY || 1;
-
-    const scale = Math.min(maxReach / width, maxReach / height);
-    const offsetX = - (width * scale) / 2;
-    const offsetY = (L1 + L2) * 0.35;
-
-    parsedPaths.forEach(path => {
-        path.points = path.points.map(pt => ({
-            x: (pt.x - minX) * scale + offsetX,
-            y: (pt.y - minY) * scale + offsetY
-        }));
-    });
-}
-
-function renderCanvasPreview(activePt = null) {
-    const canvas = document.getElementById("previewCanvas");
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (parsedPaths.length === 0) return;
-
-    const L1 = parseFloat(document.getElementById("link1Length").value) || 114;
-    const L2 = parseFloat(document.getElementById("link2Length").value) || 218.51;
-    const reach = L1 + L2;
-
-    const scaleX = canvas.width / (reach * 2);
-    const scaleY = canvas.height / reach;
-
-    ctx.strokeStyle = "#333";
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
-    ctx.strokeStyle = "#007aff";
-    ctx.lineWidth = 2;
-    parsedPaths.forEach(path => {
-        ctx.beginPath();
-        path.points.forEach((pt, idx) => {
-            const cx = (pt.x + reach) * scaleX;
-            const cy = canvas.height - (pt.y * scaleY);
-            if (idx === 0) ctx.moveTo(cx, cy);
-            else ctx.lineTo(cx, cy);
-        });
-        ctx.stroke();
-    });
-
-    if (activePt) {
-        const curX = (activePt.x + reach) * scaleX;
-        const curY = canvas.height - (activePt.y * scaleY);
-        ctx.fillStyle = "#ff3b30";
-        ctx.beginPath();
-        ctx.arc(curX, curY, 5, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
+// ==================== EXECUTION ENGINE ==================== //
 
 async function startPlotting() {
     if (!rxCharacteristic) {
         alert("Connect Bluetooth first!");
+        return;
+    }
+
+    if (transformedPaths.length === 0) {
+        alert("Please load an SVG or Image first!");
         return;
     }
 
@@ -463,27 +477,26 @@ async function startPlotting() {
     const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 15;
 
     let totalPoints = 0;
-    parsedPaths.forEach(p => totalPoints += p.points.length);
+    transformedPaths.forEach(p => totalPoints += p.points.length);
     let currentPointIndex = 0;
 
-    for (let pIdx = 0; pIdx < parsedPaths.length; pIdx++) {
+    for (let pIdx = 0; pIdx < transformedPaths.length; pIdx++) {
         if (shouldAbort) break;
 
-        const path = parsedPaths[pIdx];
+        const path = transformedPaths[pIdx];
 
-        // Calculate start target
         const startTarget = calculateIK(path.points[0].x, path.points[0].y);
         if (!startTarget) continue;
 
-        // Pen UP & move to start
+        // Pen UP & move to stroke start
         await lerpMove(startTarget.base, startTarget.joint, 0, lerpDelayMs);
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 150));
 
         // Lower Pen
         await sendPacket(startTarget.base, startTarget.joint, 1);
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 150));
 
-        // Trace stroke segment
+        // Trace Stroke
         for (let ptIdx = 0; ptIdx < path.points.length; ptIdx++) {
             if (shouldAbort) break;
 
@@ -492,7 +505,7 @@ async function startPlotting() {
             if (!angles) continue;
 
             await lerpMove(angles.base, angles.joint, 1, lerpDelayMs);
-            
+
             currentPointIndex++;
             const pct = Math.round((currentPointIndex / totalPoints) * 100);
             document.getElementById("plotProgress").style.width = pct + "%";
@@ -500,19 +513,19 @@ async function startPlotting() {
             renderCanvasPreview(pt);
         }
 
-        // Raise Pen after stroke
+        // Lift Pen after stroke
         const lastPt = path.points[path.points.length - 1];
         const endTarget = calculateIK(lastPt.x, lastPt.y);
         if (endTarget) {
             await sendPacket(endTarget.base, endTarget.joint, 0);
-            await new Promise(r => setTimeout(r, 150));
+            await new Promise(r => setTimeout(r, 100));
         }
     }
 
     isPlotting = false;
     document.getElementById("startPlotBtn").disabled = false;
     document.getElementById("stopPlotBtn").disabled = true;
-    document.getElementById("plotStatusText").innerText = shouldAbort ? "Plot Aborted!" : "Plot Completed Successfully!";
+    document.getElementById("plotStatusText").innerText = shouldAbort ? "Plot Aborted!" : "Plot Completed!";
     renderCanvasPreview();
 }
 
