@@ -205,37 +205,31 @@ function calculateIK(x, y) {
     const distanceSq = x * x + y * y;
     const distance = Math.sqrt(distanceSq);
 
-    // Check reachability
-    if (distance > (L1 + L2)) {
-        console.warn(`Target (${x}, ${y}) out of reach! Max reach: ${L1 + L2}mm`);
-        return null;
-    }
-    if (distance < Math.abs(L1 - L2)) {
-        console.warn(`Target (${x}, ${y}) too close to base!`);
+    // Reachability guard
+    if (distance > (L1 + L2) || distance < Math.abs(L1 - L2)) {
         return null;
     }
 
-    // Law of Cosines for Joint 2 Angle (Elbow)
+    // Law of Cosines
     const cosTheta2 = (distanceSq - L1 * L1 - L2 * L2) / (2 * L1 * L2);
-    const clampedCosTheta2 = Math.max(-1, Math.min(1, cosTheta2));
+    const clampedCos = Math.max(-1, Math.min(1, cosTheta2));
+    const theta2 = Math.acos(clampedCos); // Interior angle
 
-    // Elbow-down solution (- Math.sqrt)
-    const theta2 = -Math.acos(clampedCosTheta2);
-
-    // Angle of target point relative to X-axis
     const alpha = Math.atan2(y, x);
-
-    // Angle offset for Joint 1 via Law of Sines/Cosines
     const beta = Math.atan2(L2 * Math.sin(theta2), L1 + L2 * Math.cos(theta2));
 
-    // Base angle (Theta 1)
-    const theta1 = alpha - beta;
+    // Standard Cartesian angles (in degrees)
+    const rawBaseDeg = (alpha + beta) * (180 / Math.PI);
+    const rawJointDeg = theta2 * (180 / Math.PI);
 
-    // Convert radians to degrees
-    let baseDeg = theta1 * (180 / Math.PI);
-    let jointDeg = Math.abs(theta2) * (180 / Math.PI);
+    // Map to your physical servo polarities & home positions
+    // Base 90° = vertical (90° standard), inverted direction
+    let baseDeg = 90 + (90 - rawBaseDeg);
 
-    // Clamp angles to physical MG996R 0-180 limits
+    // Joint 90° = perpendicular right, decreasing moves right
+    let jointDeg = 180 - rawJointDeg;
+
+    // Clamp to physical 0-180 limits
     baseDeg = Math.max(0, Math.min(180, Math.round(baseDeg)));
     jointDeg = Math.max(0, Math.min(180, Math.round(jointDeg)));
 
