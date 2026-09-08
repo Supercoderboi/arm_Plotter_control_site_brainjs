@@ -1,1313 +1,530 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-
-<meta name="viewport"
-      content="width=device-width,
-               initial-scale=1.0,
-               maximum-scale=1.0,
-               user-scalable=no">
-
-<title>SCARA Wireless Plotter</title>
-
-<style>
-* {
-    box-sizing: border-box;
-}
-
-body {
-    margin: 0;
-    padding: 15px;
-    background: #121212;
-    color: #eeeeee;
-    font-family: Arial, sans-serif;
-}
-
-h1 {
-    font-size: 24px;
-    margin: 0 0 15px;
-}
-
-h2 {
-    font-size: 18px;
-    margin: 0 0 12px;
-}
-
-.card {
-    background: #1e1e1e;
-    border-radius: 12px;
-    padding: 15px;
-    margin-bottom: 15px;
-}
-
-button {
-    width: 100%;
-    border: none;
-    border-radius: 8px;
-    padding: 13px;
-    margin: 5px 0;
-    background: #333;
-    color: white;
-    font-size: 15px;
-    cursor: pointer;
-}
-
-button:active {
-    transform: scale(.98);
-}
-
-button:disabled {
-    opacity: .4;
-}
-
-.connect {
-    background: #1565c0;
-}
-
-.green {
-    background: #287d35;
-}
-
-.red {
-    background: #a52828;
-}
-
-.row {
-    display: flex;
-    gap: 8px;
-}
-
-.row button {
-    flex: 1;
-}
-
-label {
-    display: block;
-    margin-top: 10px;
-    margin-bottom: 5px;
-}
-
-input[type="range"] {
-    width: 100%;
-}
-
-input[type="file"] {
-    width: 100%;
-    padding: 8px;
-    color: white;
-}
-
-.value {
-    float: right;
-    color: #64b5f6;
-}
-
-.status {
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 8px;
-    background: #292929;
-    font-size: 14px;
-}
-
-.hint {
-    color: #aaa;
-    font-size: 13px;
-    line-height: 1.5;
-    margin-top: 10px;
-}
-
-#previewWrapper {
-    width: 100%;
-    background: #080808;
-    border: 1px solid #444;
-    border-radius: 10px;
-    overflow: hidden;
-    touch-action: none;
-}
-
-#preview {
-    display: block;
-    width: 100%;
-    height: auto;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-}
-
-#log {
-    background: #080808;
-    border-radius: 8px;
-    padding: 10px;
-    height: 180px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    font-family: monospace;
-    font-size: 12px;
-}
-
-.good {
-    color: #81c784;
-}
-
-.bad {
-    color: #ef5350;
-}
-
-.info {
-    color: #64b5f6;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCARA Controller - Precision IK</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; background: #121212; color: #fff; }
+        .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        button { background: #007aff; color: #fff; border: none; padding: 12px 20px; font-size: 16px; border-radius: 8px; width: 100%; margin: 5px 0; cursor: pointer; }
+        button:disabled { background: #444; }
+        .btn-green { background: #34c759; }
+        .btn-red { background: #ff3b30; }
+        .btn-secondary { background: #5856d6; }
+        input[type="number"], input[type="text"] { width: calc(100% - 22px); padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #333; background: #2c2c2c; color: #fff; font-size: 16px; }
+        .row { display: flex; gap: 10px; }
+        .status { font-weight: bold; color: #ff3b30; }
+        .connected { color: #34c759; }
+        .prediction-box { background: #2a2a2a; border-left: 4px solid #007aff; padding: 10px; margin-top: 10px; border-radius: 4px; }
+        canvas { background: #000; border-radius: 8px; width: 100%; height: auto; margin-top: 10px; border: 1px solid #333; }
+        .progress-bar { background: #333; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { background: #34c759; height: 100%; width: 0%; transition: width 0.1s; }
+        .setting-label { font-size: 13px; color: #aaa; margin-top: 6px; }
+    </style>
 </head>
-
 <body>
 
-<h1>🤖 SCARA Wireless Plotter</h1>
-
-<!-- =====================================================
-     BLUETOOTH
-===================================================== -->
-
-<div class="card">
-
-<h2>📡 Bluetooth</h2>
-
-<button id="connectBtn" class="connect">
-    🔵 Connect to SCARA
-</button>
-
-<button id="disconnectBtn" disabled>
-    Disconnect
-</button>
-
-<div id="bleStatus" class="status">
-    Not connected
-</div>
-
-</div>
-
-
-<!-- =====================================================
-     ARM
-===================================================== -->
-
-<div class="card">
-
-<h2>⚙️ Arm</h2>
-
-<div class="status">
-
-Link 1:
-<b>120 mm</b>
-
-<br>
-
-Link 2:
-<b>220 mm</b>
-
-<br><br>
-
-Maximum reach:
-<b>340 mm</b>
-
-<br>
-
-Minimum radius:
-<b>100 mm</b>
-
-</div>
-
-</div>
-
-
-<!-- =====================================================
-     MANUAL
-===================================================== -->
-
-<div class="card">
-
-<h2>🎮 Manual Servo Control</h2>
-
-<label>
-Base
-<span id="baseValue" class="value">90°</span>
-</label>
-
-<input
-    id="baseSlider"
-    type="range"
-    min="0"
-    max="180"
-    value="90">
-
-<label>
-Joint
-<span id="jointValue" class="value">90°</span>
-</label>
-
-<input
-    id="jointSlider"
-    type="range"
-    min="0"
-    max="180"
-    value="90">
-
-<button id="moveManualBtn">
-    Move
-</button>
-
-<div class="row">
-
-<button id="penUpBtn">
-    ✏️ Pen UP
-</button>
-
-<button id="penDownBtn">
-    🖊️ Pen DOWN
-</button>
-
-</div>
-
-</div>
-
-
-<!-- =====================================================
-     SVG
-===================================================== -->
-
-<div class="card">
-
-<h2>🖼️ Drawing</h2>
-
-<input
-    id="svgFile"
-    type="file"
-    accept=".svg,image/svg+xml">
-
-<label>
-Scale
-<span id="scaleValue" class="value">
-    1.00×
-</span>
-</label>
-
-<input
-    id="scaleSlider"
-    type="range"
-    min="0.1"
-    max="3"
-    step="0.05"
-    value="1">
-
-<div class="row">
-
-<button id="centerBtn">
-    🎯 Center
-</button>
-
-<button id="resetBtn">
-    🔄 Reset
-</button>
-
-</div>
-
-<div class="hint">
-
-👆 Drag the drawing directly on the grid.
-
-<br>
-
-📱 Touch dragging supported.
-
-<br>
-
-📐 Grid = millimetres.
-
-<br>
-
-🎯 SCARA base = <b>(0,0)</b>.
-
-</div>
-
-</div>
-
-
-<!-- =====================================================
-     PREVIEW
-===================================================== -->
-
-<div class="card">
-
-<h2>📐 SCARA Workspace</h2>
-
-<div id="previewWrapper">
-    <canvas id="preview"></canvas>
-</div>
-
-<div id="workspaceStatus" class="status">
-    No SVG loaded.
-</div>
-
-</div>
-
-
-<!-- =====================================================
-     PLOT
-===================================================== -->
-
-<div class="card">
-
-<h2>🖊️ Plot</h2>
-
-<label>
-Point delay
-<span id="delayValue" class="value">
-    20 ms
-</span>
-</label>
-
-<input
-    id="delaySlider"
-    type="range"
-    min="5"
-    max="200"
-    step="5"
-    value="20">
-
-<button
-    id="startBtn"
-    class="green"
-    disabled>
-
-▶ Start Plot
-
-</button>
-
-<button
-    id="abortBtn"
-    class="red"
-    disabled>
-
-⛔ Abort
-
-</button>
-
-<div id="progress" class="status">
-    Ready
-</div>
-
-</div>
-
-
-<!-- =====================================================
-     DEBUG
-===================================================== -->
-
-<div class="card">
-
-<h2>🛠 Debug Log</h2>
-
-<div id="log"></div>
-
-</div>
-
+    <h2>SCARA Geometric IK Controller</h2>
+
+    <!-- BLE Connection -->
+    <div class="card">
+        <div>Status: <span id="bleStatus" class="status">Disconnected</span></div>
+        <button id="connectBtn" onclick="connectBLE()">Connect Bluetooth</button>
+    </div>
+
+    <!-- Arm Kinematics Configuration -->
+    <div class="card">
+        <h3>Calibrated Arm Dimensions</h3>
+        <div class="row">
+            <div>
+                <div class="setting-label">Link 1 (Base -> Joint)</div>
+                <input type="number" id="link1Length" value="114" step="0.01">
+            </div>
+            <div>
+                <div class="setting-label">Link 2 (Joint -> Pen)</div>
+                <input type="number" id="link2Length" value="218.51" step="0.01">
+            </div>
+        </div>
+        <div class="setting-label">Max Reach: <span id="maxReachText">332.51</span> mm</div>
+    </div>
+
+    <!-- Manual Servo Control -->
+    <div class="card">
+        <h3>Manual Servo Control</h3>
+        <label>Base Angle (0-180): <span id="baseVal">90</span>°</label>
+        <input type="range" id="baseSlider" min="0" max="180" value="90" style="width: 100%;" oninput="handleSliderInput()">
+        
+        <label>Joint Angle (0-180): <span id="jointVal">45</span>°</label>
+        <input type="range" id="jointSlider" min="0" max="180" value="45" style="width: 100%;" oninput="handleSliderInput()">
+
+        <div class="row">
+            <button onclick="togglePen(1)">Pen DOWN</button>
+            <button onclick="togglePen(0)">Pen UP</button>
+        </div>
+    </div>
+
+    <!-- Single Movement Target (Geometric IK) -->
+    <div class="card">
+        <h3>Move to Cartesian (X, Y)</h3>
+        <div class="row">
+            <input type="number" id="targetX" placeholder="Target X (mm)">
+            <input type="number" id="targetY" placeholder="Target Y (mm)">
+        </div>
+        <button onclick="moveToTarget()">Move via Precise IK</button>
+
+        <div id="predictionDisplay" class="prediction-box" style="display: none;">
+            <strong>Target Position:</strong> X: <span id="outX">0</span> mm, Y: <span id="outY">0</span> mm<br>
+            <strong>Calculated IK Angles:</strong> Base: <span id="outBase">0</span>°, Joint: <span id="outJoint">0</span>°
+        </div>
+    </div>
+
+    <!-- File Plotting Engine (SVG & Raster PNG/JPG) -->
+    <div class="card">
+        <h3>Vector & Image Plotter</h3>
+        <div class="row">
+            <button onclick="document.getElementById('svgFileInput').click()" class="btn-secondary">Load SVG Vector</button>
+            <button onclick="document.getElementById('imgFileInput').click()" class="btn-secondary">Load Image (PNG/JPG)</button>
+        </div>
+        <input type="file" id="svgFileInput" accept=".svg" style="display:none;" onchange="handleSVGUpload(event)">
+        <input type="file" id="imgFileInput" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
+        
+        <div class="setting-label">Interpolation Delay per Sub-Step (ms)</div>
+        <input type="number" id="lerpDelayInput" value="15" min="5" max="100">
+
+        <div class="row" style="margin-top: 10px;">
+            <button id="startPlotBtn" onclick="startPlotting()" class="btn-green">Start Smooth Plot</button>
+            <button id="stopPlotBtn" onclick="stopPlotting()" class="btn-red" disabled>Abort Plot</button>
+        </div>
+
+        <div class="progress-bar">
+            <div id="plotProgress" class="progress-fill"></div>
+        </div>
+        <div id="plotStatusText" style="margin-top: 5px; font-size: 14px;">No File Loaded</div>
+
+        <!-- Canvas Preview -->
+        <canvas id="previewCanvas" width="300" height="300"></canvas>
+    </div>
 
 <script>
-
-/* =====================================================
-   CONFIG
-===================================================== */
-
-const L1 = 120;
-const L2 = 220;
-
-const BASE_OFF = 65;
-const JOINT_OFF = 175;
-
-
-/* BLE */
-
-const SERVICE_UUID =
-    "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-
-const RX_UUID =
-    "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
-
-const DEVICE_NAME =
-    "SCARA_Plotter";
-
-
-/* =====================================================
-   STATE
-===================================================== */
-
-let device = null;
-let server = null;
-let characteristic = null;
-
-let currentBase = 90;
-let currentJoint = 90;
-
-let penState = 0;
-
-let svgLoaded = false;
-
-let svgStrokes = [];
-
-let svgOffsetX = 0;
-let svgOffsetY = 0;
-
-let svgScale = 1;
-
-let plotting = false;
-let abortPlot = false;
-
-
-/* =====================================================
-   ELEMENTS
-===================================================== */
-
-const canvas =
-    document.getElementById("preview");
-
-const ctx =
-    canvas.getContext("2d");
-
-const wrapper =
-    document.getElementById("previewWrapper");
-
-
-/* =====================================================
-   LOG
-===================================================== */
-
-function log(text) {
-
-    const box =
-        document.getElementById("log");
-
-    const time =
-        new Date().toLocaleTimeString();
-
-    box.textContent +=
-        "[" + time + "] " +
-        text +
-        "\n";
-
-    box.scrollTop =
-        box.scrollHeight;
-}
-
-
-window.addEventListener(
-    "error",
-    function(e) {
-
-        log(
-            "JS ERROR: " +
-            e.message
-        );
-    }
-);
-
-
-window.addEventListener(
-    "unhandledrejection",
-    function(e) {
-
-        log(
-            "PROMISE ERROR: " +
-            e.reason
-        );
-    }
-);
-
-
-/* =====================================================
-   CANVAS
-===================================================== */
-
-const VIEW_MM = 380;
-
-let canvasWidth = 350;
-let canvasHeight = 350;
-let pixelsPerMM = 0.45;
-
-
-function resizeCanvas() {
-
-    const width =
-        wrapper.clientWidth || 350;
-
-    const dpr =
-        window.devicePixelRatio || 1;
-
-    canvasWidth = width;
-    canvasHeight = width;
-
-    canvas.width =
-        Math.round(width * dpr);
-
-    canvas.height =
-        Math.round(width * dpr);
-
-    canvas.style.width =
-        width + "px";
-
-    canvas.style.height =
-        width + "px";
-
-    ctx.setTransform(
-        dpr,
-        0,
-        0,
-        dpr,
-        0,
-        0
-    );
-
-    pixelsPerMM =
-        width / (VIEW_MM * 2);
-
-    drawPreview();
-}
-
-
-window.addEventListener(
-    "resize",
-    resizeCanvas
-);
-
-
-/* =====================================================
-   COORDINATES
-===================================================== */
-
-function mmToCanvas(x, y) {
-
-    return {
-
-        x:
-            canvasWidth / 2 +
-            x * pixelsPerMM,
-
-        y:
-            canvasHeight / 2 -
-            y * pixelsPerMM
-
-    };
-}
-
-
-function canvasToMM(x, y) {
-
-    return {
-
-        x:
-            (x - canvasWidth / 2) /
-            pixelsPerMM,
-
-        y:
-            (canvasHeight / 2 - y) /
-            pixelsPerMM
-
-    };
-}
-
-
-/* =====================================================
-   GRID
-===================================================== */
-
-function drawGrid() {
-
-    ctx.clearRect(
-        0,
-        0,
-        canvasWidth,
-        canvasHeight
-    );
-
-    ctx.fillStyle = "#080808";
-
-    ctx.fillRect(
-        0,
-        0,
-        canvasWidth,
-        canvasHeight
-    );
-
-
-    /* GRID */
-
-    for (
-        let mm = -VIEW_MM;
-        mm <= VIEW_MM;
-        mm += 20
-    ) {
-
-        const p =
-            mmToCanvas(mm, 0);
-
-        ctx.beginPath();
-
-        ctx.moveTo(
-            p.x,
-            0
-        );
-
-        ctx.lineTo(
-            p.x,
-            canvasHeight
-        );
-
-        ctx.strokeStyle =
-            mm % 100 === 0
-                ? "#333"
-                : "#1c1c1c";
-
-        ctx.lineWidth =
-            mm % 100 === 0
-                ? 1
-                : 0.5;
-
-        ctx.stroke();
-
-
-        const q =
-            mmToCanvas(0, mm);
-
-        ctx.beginPath();
-
-        ctx.moveTo(
-            0,
-            q.y
-        );
-
-        ctx.lineTo(
-            canvasWidth,
-            q.y
-        );
-
-        ctx.stroke();
-    }
-
-
-    /* ORIGIN */
-
-    const origin =
-        mmToCanvas(0, 0);
-
-
-    /* X AXIS */
-
-    ctx.beginPath();
-
-    ctx.moveTo(
-        0,
-        origin.y
-    );
-
-    ctx.lineTo(
-        canvasWidth,
-        origin.y
-    );
-
-    ctx.strokeStyle =
-        "#888";
-
-    ctx.lineWidth = 1.5;
-
-    ctx.stroke();
-
-
-    /* Y AXIS */
-
-    ctx.beginPath();
-
-    ctx.moveTo(
-        origin.x,
-        0
-    );
-
-    ctx.lineTo(
-        origin.x,
-        canvasHeight
-    );
-
-    ctx.stroke();
-
-
-    /* OUTER REACH */
-
-    ctx.beginPath();
-
-    ctx.arc(
-        origin.x,
-        origin.y,
-        L1 + L2 > 0
-            ? (L1 + L2) * pixelsPerMM
-            : 0,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.setLineDash([7,5]);
-
-    ctx.strokeStyle =
-        "#65a86b";
-
-    ctx.stroke();
-
-
-    /* INNER HOLE */
-
-    ctx.beginPath();
-
-    ctx.arc(
-        origin.x,
-        origin.y,
-        Math.abs(L2 - L1) *
-        pixelsPerMM,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.strokeStyle =
-        "#a85b5b";
-
-    ctx.stroke();
-
-    ctx.setLineDash([]);
-
-
-    /* ORIGIN DOT */
-
-    ctx.beginPath();
-
-    ctx.arc(
-        origin.x,
-        origin.y,
-        5,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.fillStyle =
-        "#fff";
-
-    ctx.fill();
-
-
-    /* LABELS */
-
-    ctx.font =
-        "12px Arial";
-
-    ctx.fillStyle =
-        "#bbb";
-
-    ctx.fillText(
-        "(0,0)",
-        origin.x + 8,
-        origin.y - 8
-    );
-
-    ctx.fillText(
-        "X",
-        canvasWidth - 18,
-        origin.y - 8
-    );
-
-    ctx.fillText(
-        "Y",
-        origin.x + 8,
-        15
-    );
-
-
-    ctx.fillStyle =
-        "#81c784";
-
-    ctx.fillText(
-        "340 mm",
-        origin.x +
-        340 * pixelsPerMM -
-        25,
-        origin.y - 8
-    );
-
-
-    ctx.fillStyle =
-        "#ef7777";
-
-    ctx.fillText(
-        "100 mm",
-        origin.x +
-        100 * pixelsPerMM -
-        25,
-        origin.y + 22
-    );
-}
-
-
-/* =====================================================
-   DRAW SVG
-===================================================== */
-
-function drawSVG() {
-
-    if (!svgLoaded)
-        return;
-
-    ctx.save();
-
-    ctx.strokeStyle =
-        "#ffffff";
-
-    ctx.lineWidth = 1.7;
-
-    ctx.lineJoin =
-        "round";
-
-    ctx.lineCap =
-        "round";
-
-
-    for (
-        const stroke of svgStrokes
-    ) {
-
-        if (stroke.length < 2)
-            continue;
-
-        ctx.beginPath();
-
-        for (
-            let i = 0;
-            i < stroke.length;
-            i++
-        ) {
-
-            const p =
-                stroke[i];
-
-            const x =
-                svgOffsetX +
-                p.x * svgScale;
-
-            const y =
-                svgOffsetY +
-                p.y * svgScale;
-
-            const screen =
-                mmToCanvas(x, y);
-
-            if (i === 0) {
-
-                ctx.moveTo(
-                    screen.x,
-                    screen.y
-                );
-
-            } else {
-
-                ctx.lineTo(
-                    screen.x,
-                    screen.y
-                );
-            }
-        }
-
-        ctx.stroke();
-    }
-
-    ctx.restore();
-}
-
-
-function drawPreview() {
-
-    drawGrid();
-    drawSVG();
-}
-
-
-/* =====================================================
-   SVG PARSER
-===================================================== */
-
-function parseSVG(text) {
-
-    log("Parsing SVG...");
-
-    const parser =
-        new DOMParser();
-
-    const doc =
-        parser.parseFromString(
-            text,
-            "image/svg+xml"
-        );
-
-    if (
-        doc.querySelector("parsererror")
-    ) {
-
-        alert("Invalid SVG.");
-
-        log("SVG parser error.");
-
-        return;
-    }
-
-
-    const strokes = [];
-
-
-    /* PATH */
-
-    doc.querySelectorAll("path")
-        .forEach(path => {
-
-            try {
-
-                /*
-                   Import the SVG into a
-                   temporary visible SVG.
-
-                   This makes getTotalLength()
-                   much more reliable on browsers.
-                */
-
-                const temp =
-                    document.createElementNS(
-                        "http://www.w3.org/2000/svg",
-                        "svg"
-                    );
-
-                temp.style.position =
-                    "absolute";
-
-                temp.style.left =
-                    "-10000px";
-
-                temp.style.top =
-                    "-10000px";
-
-                temp.style.width =
-                    "1px";
-
-                temp.style.height =
-                    "1px";
-
-                document.body.appendChild(temp);
-
-
-                const copy =
-                    document.importNode(
-                        path,
-                        true
-                    );
-
-                temp.appendChild(copy);
-
-
-                const length =
-                    copy.getTotalLength();
-
-
-                const points = [];
-
-
-                const samples =
-                    Math.max(
-                        2,
-                        Math.ceil(
-                            length / 3
-                        )
-                    );
-
-
-                for (
-                    let i = 0;
-                    i <= samples;
-                    i++
-                ) {
-
-                    const p =
-                        copy.getPointAtLength(
-                            length *
-                            i /
-                            samples
-                        );
-
-                    points.push({
-
-                        x: p.x,
-                        y: p.y
-
-                    });
-                }
-
-
-                temp.remove();
-
-
-                if (
-                    points.length > 1
-                ) {
-
-                    strokes.push(
-                        points
-                    );
-                }
-
-            } catch(e) {
-
-                log(
-                    "Could not parse path."
-                );
-            }
-
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+
+let rxCharacteristic = null;
+let bleDevice = null;
+let currentPenState = 0;
+let isSending = false;
+
+// Hardware Position Tracking
+let currentBaseAngle = 90;
+let currentJointAngle = 45;
+
+// File Engine State
+let parsedPaths = [];
+let isPlotting = false;
+let shouldAbort = false;
+
+async function connectBLE() {
+    try {
+        bleDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ name: 'SCARA_Plotter' }],
+            optionalServices: [SERVICE_UUID]
         });
 
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_RX_UUID);
 
-    /* POLYLINE + POLYGON */
+        document.getElementById("bleStatus").innerText = "Connected";
+        document.getElementById("bleStatus").className = "status connected";
+    } catch (error) {
+        alert("BLE Error: " + error);
+    }
+}
 
-    doc.querySelectorAll(
-        "polyline, polygon"
-    ).forEach(element => {
+async function sendPacket(base, joint, pen) {
+    if (!rxCharacteristic) return;
+    const encoder = new TextEncoder();
+    const packet = `${Math.round(base)},${Math.round(joint)},${pen}\n`;
+    await rxCharacteristic.writeValue(encoder.encode(packet));
+    currentBaseAngle = base;
+    currentJointAngle = joint;
+}
 
-        const raw =
-            element.getAttribute(
-                "points"
-            );
+// LERP Smoothed Movement Pipeline
+async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 15) {
+    const startBase = currentBaseAngle;
+    const startJoint = currentJointAngle;
 
-        if (!raw)
-            return;
+    const baseDelta = Math.abs(targetBase - startBase);
+    const jointDelta = Math.abs(targetJoint - startJoint);
+    const maxDelta = Math.max(baseDelta, jointDelta);
 
+    const steps = Math.max(1, Math.ceil(maxDelta));
 
-        const nums =
-            raw.trim()
-               .split(/[\s,]+/)
-               .map(Number);
+    for (let i = 1; i <= steps; i++) {
+        if (shouldAbort) break;
+        const t = i / steps;
+        const interpBase = startBase + (targetBase - startBase) * t;
+        const interpJoint = startJoint + (targetJoint - startJoint) * t;
 
+        await sendPacket(interpBase, interpJoint, penState);
+        await new Promise(r => setTimeout(r, stepDelayMs));
+    }
+}
 
-        const points = [];
+async function handleSliderInput() {
+    const base = parseFloat(document.getElementById("baseSlider").value);
+    const joint = parseFloat(document.getElementById("jointSlider").value);
+    document.getElementById("baseVal").innerText = base;
+    document.getElementById("jointVal").innerText = joint;
 
+    if (isSending || !rxCharacteristic) return;
 
-        for (
-            let i = 0;
-            i + 1 < nums.length;
-            i += 2
-        ) {
+    try {
+        isSending = true;
+        await sendPacket(base, joint, currentPenState);
+    } catch (err) {
+        console.error("BLE Send Error:", err);
+    } finally {
+        isSending = false;
+    }
+}
 
-            if (
-                !Number.isFinite(
-                    nums[i]
-                ) ||
-                !Number.isFinite(
-                    nums[i + 1]
-                )
-            )
-                continue;
+function togglePen(state) {
+    currentPenState = state;
+    handleSliderInput();
+}
 
+// ==================== GEOMETRIC INVERSE KINEMATICS ==================== //
 
-            points.push({
+function calculateIK(x, y) {
+    const L1 = parseFloat(document.getElementById("link1Length").value) || 114;
+    const L2 = parseFloat(document.getElementById("link2Length").value) || 218.51;
 
-                x: nums[i],
-                y: nums[i + 1]
+    const distanceSq = x * x + y * y;
+    const distance = Math.sqrt(distanceSq);
 
-            });
+    // Check reachability
+    if (distance > (L1 + L2)) {
+        console.warn(`Target (${x}, ${y}) out of reach! Max reach: ${L1 + L2}mm`);
+        return null;
+    }
+    if (distance < Math.abs(L1 - L2)) {
+        console.warn(`Target (${x}, ${y}) too close to base!`);
+        return null;
+    }
+
+    // Law of Cosines for Joint 2 Angle (Elbow)
+    const cosTheta2 = (distanceSq - L1 * L1 - L2 * L2) / (2 * L1 * L2);
+    const clampedCosTheta2 = Math.max(-1, Math.min(1, cosTheta2));
+
+    // Elbow-down solution (- Math.sqrt)
+    const theta2 = -Math.acos(clampedCosTheta2);
+
+    // Angle of target point relative to X-axis
+    const alpha = Math.atan2(y, x);
+
+    // Angle offset for Joint 1 via Law of Sines/Cosines
+    const beta = Math.atan2(L2 * Math.sin(theta2), L1 + L2 * Math.cos(theta2));
+
+    // Base angle (Theta 1)
+    const theta1 = alpha - beta;
+
+    // Convert radians to degrees
+    let baseDeg = theta1 * (180 / Math.PI);
+    let jointDeg = Math.abs(theta2) * (180 / Math.PI);
+
+    // Clamp angles to physical MG996R 0-180 limits
+    baseDeg = Math.max(0, Math.min(180, Math.round(baseDeg)));
+    jointDeg = Math.max(0, Math.min(180, Math.round(jointDeg)));
+
+    return { base: baseDeg, joint: jointDeg };
+}
+
+async function moveToTarget() {
+    const tx = parseFloat(document.getElementById("targetX").value);
+    const ty = parseFloat(document.getElementById("targetY").value);
+
+    if (isNaN(tx) || isNaN(ty)) {
+        alert("Please enter valid Target X and Y values!");
+        return;
+    }
+
+    const angles = calculateIK(tx, ty);
+    if (!angles) {
+        alert("Target point is outside the reach of the SCARA arm!");
+        return;
+    }
+
+    document.getElementById("outX").innerText = tx;
+    document.getElementById("outY").innerText = ty;
+    document.getElementById("outBase").innerText = angles.base;
+    document.getElementById("outJoint").innerText = angles.joint;
+    document.getElementById("predictionDisplay").style.display = "block";
+
+    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 15;
+    await lerpMove(angles.base, angles.joint, currentPenState, delay);
+}
+
+// ==================== SVG & IMAGE PROCESSING ENGINE ==================== //
+
+function handleSVGUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        parseSVGData(e.target.result);
+    };
+    reader.readAsText(file);
+}
+
+function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const img = new Image();
+    img.onload = function() {
+        processImageToPaths(img);
+    };
+    img.src = URL.createObjectURL(file);
+}
+
+function processImageToPaths(img) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const maxDim = 120; // Resolution limit for edge tracing
+    
+    let w = img.width;
+    let h = img.height;
+    if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+    else { w = Math.round((w * maxDim) / h); h = maxDim; }
+
+    canvas.width = w; canvas.height = h;
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    // Convert to Grayscale Edges
+    let edges = new Uint8Array(w * h);
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            let idx = (y * w + x) * 4;
+            let val = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+            let valRight = (data[idx + 4] + data[idx + 5] + data[idx + 6]) / 3;
+            let valDown = (data[((y + 1) * w + x) * 4] + data[((y + 1) * w + x) * 4 + 1] + data[((y + 1) * w + x) * 4 + 2]) / 3;
+            
+            let diff = Math.abs(val - valRight) + Math.abs(val - valDown);
+            edges[y * w + x] = diff > 40 ? 1 : 0;
         }
+    }
 
+    parsedPaths = [];
+    let visited = new Uint8Array(w * h);
 
-        if (
-            element.tagName.toLowerCase() ===
-            "polygon" &&
-            points.length > 1
-        ) {
+    // Group adjacent edges into stroke paths
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            if (edges[y * w + x] && !visited[y * w + x]) {
+                let pathObj = { points: [] };
+                let currX = x, currY = y;
+                
+                while (currX >= 0 && currX < w && currY >= 0 && currY < h && edges[currY * w + currX] && !visited[currY * w + currX]) {
+                    visited[currY * w + currX] = 1;
+                    pathObj.points.push({ x: currX, y: currY });
 
-            points.push({
-                x: points[0].x,
-                y: points[0].y
-            });
+                    // Check neighbors
+                    let nextPt = false;
+                    for (let dy = -1; dy <= 1 && !nextPt; dy++) {
+                        for (let dx = -1; dx <= 1 && !nextPt; dx++) {
+                            let nx = currX + dx, ny = currY + dy;
+                            if (nx >= 0 && nx < w && ny >= 0 && ny < h && edges[ny * w + nx] && !visited[ny * w + nx]) {
+                                currX = nx; currY = ny;
+                                nextPt = true;
+                            }
+                        }
+                    }
+                    if (!nextPt) break;
+                }
+
+                if (pathObj.points.length > 3) {
+                    parsedPaths.push(pathObj);
+                }
+            }
         }
+    }
 
+    scalePathsToWorkspace(0, w, 0, h);
+    document.getElementById("plotStatusText").innerText = `Image converted into ${parsedPaths.length} drawing paths.`;
+    renderCanvasPreview();
+}
 
-        if (points.length > 1)
-            strokes.push(points);
+function parseSVGData(svgText) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgText, "image/svg+xml");
+    const pathElements = doc.querySelectorAll("path, polygon, polyline, line, rect, circle");
 
+    parsedPaths = [];
+    let rawMinX = Infinity, rawMaxX = -Infinity, rawMinY = Infinity, rawMaxY = -Infinity;
+
+    pathElements.forEach(el => {
+        let pathObj = { points: [] };
+        if (el.tagName.toLowerCase() === 'path') {
+            const d = el.getAttribute("d");
+            if (d) {
+                const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                tempPath.setAttribute("d", d);
+                const length = tempPath.getTotalLength();
+                const step = Math.max(1, length / 40);
+                
+                for (let i = 0; i <= length; i += step) {
+                    const pt = tempPath.getPointAtLength(i);
+                    pathObj.points.push({ x: pt.x, y: pt.y });
+                    rawMinX = Math.min(rawMinX, pt.x); rawMaxX = Math.max(rawMaxX, pt.x);
+                    rawMinY = Math.min(rawMinY, pt.y); rawMaxY = Math.max(rawMaxY, pt.y);
+                }
+            }
+        }
+        if (pathObj.points.length > 0) parsedPaths.push(pathObj);
     });
 
+    scalePathsToWorkspace(rawMinX, rawMaxX, rawMinY, rawMaxY);
+    document.getElementById("plotStatusText").innerText = `Loaded SVG with ${parsedPaths.length} stroke segments.`;
+    renderCanvasPreview();
+}
 
-    /* LINE */
+function scalePathsToWorkspace(minX, maxX, minY, maxY) {
+    const L1 = parseFloat(document.getElementById("link1Length").value) || 114;
+    const L2 = parseFloat(document.getElementById("link2Length").value) || 218.51;
+    const maxReach = (L1 + L2) * 0.75; // 75% max safety reach
 
-    doc.querySelectorAll("line")
-        .forEach(element => {
+    const width = maxX - minX || 1;
+    const height = maxY - minY || 1;
 
-            const x1 =
-                Number(
-                    element.getAttribute("x1") || 0
-                );
+    const scale = Math.min(maxReach / width, maxReach / height);
+    const offsetX = - (width * scale) / 2;
+    const offsetY = (L1 + L2) * 0.35;
 
-            const y1 =
-                Number(
-                    element.getAttribute("y1") || 0
-                );
+    parsedPaths.forEach(path => {
+        path.points = path.points.map(pt => ({
+            x: (pt.x - minX) * scale + offsetX,
+            y: (pt.y - minY) * scale + offsetY
+        }));
+    });
+}
 
-            const x2 =
-                Number(
-                    element.getAttribute("x2") || 0
-                );
+function renderCanvasPreview(activePt = null) {
+    const canvas = document.getElementById("previewCanvas");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const y2 =
-                Number(
-                    element.getAttribute("y2") || 0
-                );
+    if (parsedPaths.length === 0) return;
 
+    const L1 = parseFloat(document.getElementById("link1Length").value) || 114;
+    const L2 = parseFloat(document.getElementById("link2Length").value) || 218.51;
+    const reach = L1 + L2;
 
-            strokes.push([
+    const scaleX = canvas.width / (reach * 2);
+    const scaleY = canvas.height / reach;
 
-                {
-                    x: x1,
-                    y: y1
-                },
+    ctx.strokeStyle = "#333";
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-                {
-                    x: x2,
-                    y: y2
-                }
-
-            ]);
-
+    ctx.strokeStyle = "#007aff";
+    ctx.lineWidth = 2;
+    parsedPaths.forEach(path => {
+        ctx.beginPath();
+        path.points.forEach((pt, idx) => {
+            const cx = (pt.x + reach) * scaleX;
+            const cy = canvas.height - (pt.y * scaleY);
+            if (idx === 0) ctx.moveTo(cx, cy);
+            else ctx.lineTo(cx, cy);
         });
+        ctx.stroke();
+    });
 
+    if (activePt) {
+        const curX = (activePt.x + reach) * scaleX;
+        const curY = canvas.height - (activePt.y * scaleY);
+        ctx.fillStyle = "#ff3b30";
+        ctx.beginPath();
+        ctx.arc(curX, curY, 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
 
-    /* RECT */
+async function startPlotting() {
+    if (!rxCharacteristic) {
+        alert("Connect Bluetooth first!");
+        return;
+    }
 
-    doc.querySelectorAll("rect")
-        .forEach(element => {
+    isPlotting = true;
+    shouldAbort = false;
+    document.getElementById("startPlotBtn").disabled = true;
+    document.getElementById("stopPlotBtn").disabled = false;
 
-            const x =
-                Number(
-                    element.getAttribute("x") || 0
-                );
+    const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 15;
 
-            const y =
-                Number(
-                    element.getAttribute("y") || 0
-                );
+    let totalPoints = 0;
+    parsedPaths.forEach(p => totalPoints += p.points.length);
+    let currentPointIndex = 0;
 
-            const w =
-                Number(
-                    element.getAttribute("width") || 0
-                );
+    for (let pIdx = 0; pIdx < parsedPaths.length; pIdx++) {
+        if (shouldAbort) break;
 
-            const h =
-                Number(
-                    element.getAttribute("height") || 0
-                );
+        const path = parsedPaths[pIdx];
 
+        // Calculate start target
+        const startTarget = calculateIK(path.points[0].x, path.points[0].y);
+        if (!startTarget) continue;
 
-            if (
-                w <= 0 ||
-                h <= 0
-            )
-                return;
+        // Pen UP & move to start
+        await lerpMove(startTarget.base, startTarget.joint, 0, lerpDelayMs);
+        await new Promise(r => setTimeout(r, 200));
 
+        // Lower Pen
+        await sendPacket(startTarget.base, startTarget.joint, 1);
+        await new Promise(r => setTimeout(r, 200));
 
-            strokes.push([
+        // Trace stroke segment
+        for (let ptIdx = 0; ptIdx < path.points.length; ptIdx++) {
+            if (shouldAbort) break;
 
-                {x:x,   y:y},
-                {x:x+w, y:y},
-                {x:x+w, y:y+h},
-                {x:x,   y:y+h},
-                {x:x,   y:y}
+            const pt = path.points[ptIdx];
+            const angles = calculateIK(pt.x, pt.y);
+            if (!angles) continue;
 
-            ]);
+            await lerpMove(angles.base, angles.joint, 1, lerpDelayMs);
+            
+            currentPointIndex++;
+            const pct = Math.round((currentPointIndex / totalPoints) * 100);
+            document.getElementById("plotProgress").style.width = pct + "%";
+            document.getElementById("plotStatusText").innerText = `Plotting... ${pct}%`;
+            renderCanvasPreview(pt);
+        }
 
-        });
+        // Raise Pen after stroke
+        const lastPt = path.points[path.points.length - 1];
+        const endTarget = calculateIK(lastPt.x, lastPt.y);
+        if (endTarget) {
+            await sendPacket(endTarget.base, endTarget.joint, 0);
+            await new Promise(r => setTimeout(r, 150));
+        }
+    }
 
+    isPlotting = false;
+    document.getElementById("startPlotBtn").disabled = false;
+    document.getElementById("stopPlotBtn").disabled = true;
+    document.getElementById("plotStatusText").innerText = shouldAbort ? "Plot Aborted!" : "Plot Completed Successfully!";
+    renderCanvasPreview();
+}
 
-    /* CIRCLE */
-
-    doc.querySelectorAll("circle")
-        .forEach(element => {
-
-            const cx =
-                Number(
-                    element.getAttribute("cx") || 0
-                );
-
-            const cy =
-                Number(
-                    element.getAttribute("cy") || 0
-                );
-
-            const r =
-                Number(
-                    element.getAttribute("r") || 0
-                );
-
-
-            if (r <= 0)
-                return;
-
-
-            const points = [];
-
-
-            for (
-                let i = 0;
-                i <= 80;
-                i++
-            ) {
-
-                const a =
-                    i /
-                    80 *
-                    Math.PI *
-                    2;
-
-
-                points.push({
-
-                    x:
-                        cx +
-                        Math.cos(a) * r,
-
-                    y:
-                        cy +
-                        Math.sin(a) * r
-
-                });
-            }
-
-
-            strokes.push(points);
-
-        });
-
-
-    /* ELLIPSE */
-
-    doc.querySelectorAll("ellipse")
-        .forEach(element => {
-
-            const cx =
-                Number(
-                    element.getAttribute("cx") || 0
-                );
-
-            const cy =
-                Number(
-                    element.getAttribute("cy") || 0
-                );
-
-            const rx =
-                Number(
-                    element.getAttribute("rx") || 0
-       
+function stopPlotting() {
+    shouldAbort = true;
+}
+</script>
+</body>
+</html>
