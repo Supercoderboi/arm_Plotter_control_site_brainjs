@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCARA Micro-Stepping Controller</title>
+    <title>SCARA 0.1° Micro-Stepping Controller</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; background: #121212; color: #fff; }
         .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
@@ -63,8 +63,8 @@
             </div>
         </div>
         <div class="row">
-            <button onclick="togglePen(1)">Pen DOWN</button>
-            <button onclick="togglePen(0)">Pen UP</button>
+            <button onclick="togglePen(1)">Pen DOWN (100°)</button>
+            <button onclick="togglePen(0)">Pen UP (130°)</button>
         </div>
         <button onclick="moveToTarget()" class="btn-green">Move to Coordinates</button>
 
@@ -109,7 +109,7 @@
         </div>
 
         <div class="setting-label">Sub-Step Delay (ms)</div>
-        <input type="number" id="lerpDelayInput" value="8" min="2" max="100">
+        <input type="number" id="lerpDelayInput" value="12" min="2" max="100">
 
         <div class="row" style="margin-top: 10px;">
             <button id="startPlotBtn" onclick="startPlotting()" class="btn-green">Start Smooth Micro-Plot</button>
@@ -128,6 +128,7 @@ const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
 let rxCharacteristic = null;
 let bleDevice = null;
+let isBusySending = false;
 
 // Hardware State
 let currentBaseAngle = 90.0;
@@ -172,18 +173,36 @@ async function connectBLE() {
     }
 }
 
-// 0.1 Degree Micro-step transmission
+// Fixed Packet Transmission with Handshake Lock
 async function sendPacket(base, joint, pen) {
     if (!rxCharacteristic) return;
-    const encoder = new TextEncoder();
-    const packet = `${base.toFixed(1)},${joint.toFixed(1)},${pen}\n`;
-    await rxCharacteristic.writeValue(encoder.encode(packet));
-    currentBaseAngle = base;
-    currentJointAngle = joint;
+    
+    // Prevent overlapping writes from bogging down the BLE buffer
+    if (isBusySending) return; 
+    isBusySending = true;
+
+    try {
+        const encoder = new TextEncoder();
+        const packet = `${base.toFixed(1)},${joint.toFixed(1)},${pen}\n`;
+        
+        // Use standard writeValue to enforce acknowledgment
+        if (rxCharacteristic.writeValueWithResponse) {
+            await rxCharacteristic.writeValueWithResponse(encoder.encode(packet));
+        } else {
+            await rxCharacteristic.writeValue(encoder.encode(packet));
+        }
+        
+        currentBaseAngle = base;
+        currentJointAngle = joint;
+    } catch (err) {
+        console.warn("BLE Packet drop:", err);
+    } finally {
+        isBusySending = false;
+    }
 }
 
 // Sub-degree LERP Movement Engine
-async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 8) {
+async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 12) {
     const startBase = currentBaseAngle;
     const startJoint = currentJointAngle;
 
@@ -191,7 +210,7 @@ async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 8) {
     const jointDelta = Math.abs(targetJoint - startJoint);
     const maxDelta = Math.max(baseDelta, jointDelta);
 
-    const stepSize = 0.1; // 0.1 Degree resolution
+    const stepSize = 0.2; // 0.2 degree steps for robust BLE throughput
     const steps = Math.max(1, Math.ceil(maxDelta / stepSize));
 
     for (let i = 1; i <= steps; i++) {
@@ -261,7 +280,7 @@ async function moveToTarget() {
     document.getElementById("baseVal").innerText = angles.base.toFixed(1);
     document.getElementById("jointVal").innerText = angles.joint.toFixed(1);
 
-    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 8;
+    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 12;
     await lerpMove(angles.base, angles.joint, currentPenState, delay);
 }
 
@@ -361,7 +380,7 @@ function renderCanvasPreview(activePt = null) {
     const originX = canvas.width / 2;
     const originY = canvas.height - 20;
 
-    // Reach Ring Constraints
+    // Workspace Reach Bounds
     ctx.strokeStyle = "#333";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -551,7 +570,7 @@ async function startPlotting() {
     document.getElementById("startPlotBtn").disabled = true;
     document.getElementById("stopPlotBtn").disabled = false;
 
-    const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 8;
+    const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 12;
 
     let totalPoints = 0;
     transformedPaths.forEach(p => totalPoints += p.points.length);
@@ -565,13 +584,13 @@ async function startPlotting() {
         const startTarget = calculateIK(path.points[0].x, path.points[0].y);
         if (!startTarget) continue;
 
-        // Pen UP & move to stroke start
+        // Move to stroke start with Pen UP (0 -> 130 deg)
         await lerpMove(startTarget.base, startTarget.joint, 0, lerpDelayMs);
-        await new Promise(r => setTimeout(r, 150));
+        await new Promise(r => setTimeout(r, 200));
 
-        // Lower Pen
+        // Lower Pen (1 -> 100 deg)
         await sendPacket(startTarget.base, startTarget.joint, 1);
-        await new Promise(r => setTimeout(r, 150));
+        await new Promise(r => setTimeout(r, 200));
 
         // Trace Stroke
         for (let ptIdx = 0; ptIdx < path.points.length; ptIdx++) {
@@ -595,7 +614,7 @@ async function startPlotting() {
         const endTarget = calculateIK(lastPt.x, lastPt.y);
         if (endTarget) {
             await sendPacket(endTarget.base, endTarget.joint, 0);
-            await new Promise(r => setTimeout(r, 100));
+            await new Promise(r => setTimeout(r, 150));
         }
     }
 
