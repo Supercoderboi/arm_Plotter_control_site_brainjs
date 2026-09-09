@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SCARA Precision Controller</title>
-    
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; background: #121212; color: #fff; }
         .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
@@ -89,7 +88,7 @@
 
     <!-- Interactive Canvas & Positioning Engine -->
     <div class="card">
-        <h3>Interactive Image Drag & Scale Engine</h3>
+        <h3>Interactive Vector Engine</h3>
         <div class="row">
             <button onclick="document.getElementById('svgFileInput').click()" class="btn-secondary">Load SVG Vector</button>
             <button onclick="document.getElementById('imgFileInput').click()" class="btn-secondary">Load Image (PNG/JPG)</button>
@@ -104,19 +103,15 @@
                 <div style="font-size: 18px; font-weight: bold; color: #34c759;"><span id="scaleValDisplay">1.0000</span>x</div>
             </div>
 
-            <!-- Direct Numeric Scale Entry -->
             <div class="setting-label">Direct Precision Input:</div>
             <input type="number" id="exactScaleInput" value="1.0000" step="0.0001" min="0.0001" max="10.0" oninput="handleExactScaleInput()">
 
-            <!-- Coarse Adjustment Slider -->
             <div class="setting-label">Coarse Scale Adjust (0.1x - 3.0x):</div>
             <input type="range" id="coarseScaleSlider" min="0.1" max="3.0" step="0.05" value="1.0" oninput="handleCoarseScaleChange()">
 
-            <!-- Fine Tuning Micro Slider -->
             <div class="setting-label">Fine Adjust Trim (±0.05x micro-step):</div>
             <input type="range" id="fineScaleSlider" min="-0.05" max="0.05" step="0.0005" value="0" oninput="handleFineScaleChange()">
 
-            <!-- Micro Nudge Buttons -->
             <div class="row" style="margin-top: 8px; justify-content: center;">
                 <button class="btn-secondary btn-tiny" onclick="nudgeScale(-0.01)">-0.01</button>
                 <button class="btn-secondary btn-tiny" onclick="nudgeScale(-0.001)">-0.001</button>
@@ -149,6 +144,9 @@
         </div>
         <div id="plotStatusText" style="margin-top: 5px; font-size: 14px;">No File Loaded</div>
     </div>
+
+    <!-- Hidden Offscreen Container for SVG DOM Rendering -->
+    <div id="svgContainer" style="display:none; position:absolute; left:-9999px; top:-9999px;"></div>
 
 <script>
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -213,7 +211,7 @@ async function sendPacket(base, joint, pen) {
     currentJointAngle = joint;
 }
 
-// Low-jitter synchronized dual-motor vector interpolation
+// Synchronized dual-motor vector interpolation
 async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 15) {
     const startX = currentX;
     const startY = currentY;
@@ -222,8 +220,7 @@ async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 15) {
     const dy = targetY - startY;
     const linearDistance = Math.hypot(dx, dy);
 
-    // Calculate total sub-steps based on path length for consistent spatial velocity
-    const resolution = 1.5; // mm per step threshold
+    const resolution = 1.5; 
     const minSteps = 12;
     const steps = Math.max(minSteps, Math.ceil(linearDistance / resolution));
 
@@ -232,8 +229,6 @@ async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 15) {
 
         const startTime = performance.now();
         const rawProgress = i / steps;
-
-        // Smoothstep acceleration curve: 3t^2 - 2t^3
         const smoothProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
 
         const interpX = startX + dx * smoothProgress;
@@ -295,6 +290,235 @@ function nudgeScale(amount) {
     document.getElementById("coarseScaleSlider").value = Math.min(3.0, Math.max(0.1, newScale));
     document.getElementById("fineScaleSlider").value = 0;
     updateScaleState(newScale);
+}
+
+// ==================== HIGH-PRECISION VECTOR & SVG PIPELINE ==================== //
+
+function parseSVGToPaths(svgString) {
+    const container = document.getElementById("svgContainer");
+    container.innerHTML = svgString;
+
+    const svgElement = container.querySelector("svg");
+    if (!svgElement) return [];
+
+    // Force shape primitives to <path>
+    const shapes = svgElement.querySelectorAll("rect, circle, ellipse, line, polyline, polygon");
+    shapes.forEach(shape => {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        if (shape.tagName.toLowerCase() === "rect") {
+            const x = parseFloat(shape.getAttribute("x") || 0);
+            const y = parseFloat(shape.getAttribute("y") || 0);
+            const w = parseFloat(shape.getAttribute("width") || 0);
+            const h = parseFloat(shape.getAttribute("height") || 0);
+            path.setAttribute("d", `M${x},${y} L${x+w},${y} L${x+w},${y+h} L${x},${y+h} Z`);
+        } else if (shape.tagName.toLowerCase() === "circle") {
+            const cx = parseFloat(shape.getAttribute("cx") || 0);
+            const cy = parseFloat(shape.getAttribute("cy") || 0);
+            const r = parseFloat(shape.getAttribute("r") || 0);
+            path.setAttribute("d", `M ${cx-r},${cy} A ${r},${r} 0 1,0 ${cx+r},${cy} A ${r},${r} 0 1,0 ${cx-r},${cy}`);
+        } else if (shape.tagName.toLowerCase() === "ellipse") {
+            const cx = parseFloat(shape.getAttribute("cx") || 0);
+            const cy = parseFloat(shape.getAttribute("cy") || 0);
+            const rx = parseFloat(shape.getAttribute("rx") || 0);
+            const ry = parseFloat(shape.getAttribute("ry") || 0);
+            path.setAttribute("d", `M ${cx-rx},${cy} A ${rx},${ry} 0 1,0 ${cx+rx},${cy} A ${rx},${ry} 0 1,0 ${cx-rx},${cy}`);
+        } else if (shape.tagName.toLowerCase() === "line") {
+            const x1 = shape.getAttribute("x1") || 0;
+            const y1 = shape.getAttribute("y1") || 0;
+            const x2 = shape.getAttribute("x2") || 0;
+            const y2 = shape.getAttribute("y2") || 0;
+            path.setAttribute("d", `M${x1},${y1} L${x2},${y2}`);
+        } else if (shape.tagName.toLowerCase() === "polygon" || shape.tagName.toLowerCase() === "polyline") {
+            const points = shape.getAttribute("points").trim().split(/\s+|,/);
+            let d = "";
+            for (let i = 0; i < points.length; i += 2) {
+                d += (i === 0 ? "M" : "L") + points[i] + "," + points[i+1] + " ";
+            }
+            if (shape.tagName.toLowerCase() === "polygon") d += "Z";
+            path.setAttribute("d", d);
+        }
+        shape.parentNode.replaceChild(path, shape);
+    });
+
+    const pathElements = svgElement.querySelectorAll("path");
+    const extractedPaths = [];
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+    pathElements.forEach(path => {
+        try {
+            const length = path.getTotalLength();
+            if (length === 0) return;
+
+            // High-resolution adaptive spatial step calculation
+            const sampleStep = 1.0; // 1mm resolution step along vector curve
+            const numSamples = Math.max(10, Math.ceil(length / sampleStep));
+
+            let currentPathObj = { points: [] };
+
+            for (let i = 0; i <= numSamples; i++) {
+                const distance = (i / numSamples) * length;
+                let pt = path.getPointAtLength(distance);
+
+                // Bake CTM Matrix transformations
+                const ctm = path.getCTM();
+                if (ctm) {
+                    const svgPoint = svgElement.createSVGPoint();
+                    svgPoint.x = pt.x;
+                    svgPoint.y = pt.y;
+                    pt = svgPoint.matrixTransform(ctm);
+                }
+
+                currentPathObj.points.push({ x: pt.x, y: pt.y });
+
+                minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x);
+                minY = Math.min(minY, pt.y); maxY = Math.max(maxY, pt.y);
+            }
+
+            if (currentPathObj.points.length > 0) {
+                extractedPaths.push(currentPathObj);
+            }
+        } catch (err) {
+            console.warn("Path discretization skipped:", err);
+        }
+    });
+
+    container.innerHTML = ""; // Clear temporary DOM node
+
+    // Center paths around vector origin and invert Y to Cartesian plane
+    const width = maxX - minX || 1;
+    const height = maxY - minY || 1;
+
+    extractedPaths.forEach(path => {
+        path.points = path.points.map(pt => ({
+            x: pt.x - minX - width / 2,
+            y: -(pt.y - minY - height / 2) 
+        }));
+    });
+
+    return optimizePathOrder(extractedPaths);
+}
+
+// Nearest Neighbor Path Sorting to minimize pen-up jump travel
+function optimizePathOrder(paths) {
+    if (paths.length <= 1) return paths;
+
+    let unvisited = [...paths];
+    let sorted = [unvisited.shift()];
+
+    while (unvisited.length > 0) {
+        let lastPoint = sorted[sorted.length - 1].points[sorted[sorted.length - 1].points.length - 1];
+        let closestIdx = 0;
+        let minDistance = Infinity;
+        let shouldReverse = false;
+
+        for (let i = 0; i < unvisited.length; i++) {
+            let startPt = unvisited[i].points[0];
+            let endPt = unvisited[i].points[unvisited[i].points.length - 1];
+
+            let distToStart = Math.hypot(startPt.x - lastPoint.x, startPt.y - lastPoint.y);
+            let distToEnd = Math.hypot(endPt.x - lastPoint.x, endPt.y - lastPoint.y);
+
+            if (distToStart < minDistance) {
+                minDistance = distToStart;
+                closestIdx = i;
+                shouldReverse = false;
+            }
+            if (distToEnd < minDistance) {
+                minDistance = distToEnd;
+                closestIdx = i;
+                shouldReverse = true;
+            }
+        }
+
+        let nextPath = unvisited.splice(closestIdx, 1)[0];
+        if (shouldReverse) nextPath.points.reverse();
+        sorted.push(nextPath);
+    }
+
+    return sorted;
+}
+
+function handleSVGUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        rawParsedPaths = parseSVGToPaths(e.target.result);
+        applyTransformations();
+        renderCanvasPreview();
+        document.getElementById("plotStatusText").innerText = `Loaded & flattened SVG (${rawParsedPaths.length} continuous paths).`;
+    };
+    reader.readAsText(file);
+}
+
+function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const img = new Image();
+    img.onload = function() {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const maxDim = 120;
+
+        let w = img.width, h = img.height;
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const data = ctx.getImageData(0, 0, w, h).data;
+        let edges = new Uint8Array(w * h);
+
+        for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+                let idx = (y * w + x) * 4;
+                let val = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+                let valRight = (data[idx + 4] + data[idx + 5] + data[idx + 6]) / 3;
+                let diff = Math.abs(val - valRight);
+                edges[y * w + x] = diff > 30 ? 1 : 0;
+            }
+        }
+
+        rawParsedPaths = [];
+        let visited = new Uint8Array(w * h);
+
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                if (edges[y * w + x] && !visited[y * w + x]) {
+                    let pathObj = { points: [] };
+                    let currX = x, currY = y;
+
+                    while (currX >= 0 && currX < w && currY >= 0 && currY < h && edges[currY * w + currX] && !visited[currY * w + currX]) {
+                        visited[currY * w + currX] = 1;
+                        pathObj.points.push({ x: currX - w / 2, y: -(currY - h / 2) });
+
+                        let nextPt = false;
+                        for (let dy = -1; dy <= 1 && !nextPt; dy++) {
+                            for (let dx = -1; dx <= 1 && !nextPt; dx++) {
+                                let nx = currX + dx, ny = currY + dy;
+                                if (nx >= 0 && nx < w && ny >= 0 && ny < h && edges[ny * w + nx] && !visited[ny * w + nx]) {
+                                    currX = nx; currY = ny;
+                                    nextPt = true;
+                                }
+                            }
+                        }
+                        if (!nextPt) break;
+                    }
+                    if (pathObj.points.length > 3) rawParsedPaths.push(pathObj);
+                }
+            }
+        }
+
+        rawParsedPaths = optimizePathOrder(rawParsedPaths);
+        applyTransformations();
+        renderCanvasPreview();
+        document.getElementById("plotStatusText").innerText = `Image converted into ${rawParsedPaths.length} optimized vector paths.`;
+    };
+    img.src = URL.createObjectURL(file);
 }
 
 // ==================== INVERSE KINEMATICS ENGINE ==================== //
@@ -499,125 +723,6 @@ function renderCanvasPreview(activePt = null) {
     }
 }
 
-// ==================== VECTOR & RASTER PATH GENERATOR ==================== //
-
-function handleSVGUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(e.target.result, "image/svg+xml");
-        const pathElements = doc.querySelectorAll("path, polygon, polyline, line, rect, circle");
-
-        rawParsedPaths = [];
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-
-        pathElements.forEach(el => {
-            let pathObj = { points: [] };
-            if (el.tagName.toLowerCase() === 'path') {
-                const d = el.getAttribute("d");
-                if (d) {
-                    const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                    tempPath.setAttribute("d", d);
-                    const length = tempPath.getTotalLength();
-                    const step = Math.max(1, length / 50);
-
-                    for (let i = 0; i <= length; i += step) {
-                        const pt = tempPath.getPointAtLength(i);
-                        pathObj.points.push({ x: pt.x, y: pt.y });
-                        minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x);
-                        minY = Math.min(minY, pt.y); maxY = Math.max(maxY, pt.y);
-                    }
-                }
-            }
-            if (pathObj.points.length > 0) rawParsedPaths.push(pathObj);
-        });
-
-        const width = maxX - minX || 1;
-        const height = maxY - minY || 1;
-        rawParsedPaths.forEach(path => {
-            path.points = path.points.map(pt => ({
-                x: pt.x - minX - width / 2,
-                y: -(pt.y - minY - height / 2) 
-            }));
-        });
-
-        applyTransformations();
-        renderCanvasPreview();
-        document.getElementById("plotStatusText").innerText = `Loaded SVG (${rawParsedPaths.length} paths). Drag/scale to place in reach.`;
-    };
-    reader.readAsText(file);
-}
-
-function handleImageUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const img = new Image();
-    img.onload = function() {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        const maxDim = 100;
-
-        let w = img.width, h = img.height;
-        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-        else { w = Math.round((w * maxDim) / h); h = maxDim; }
-
-        canvas.width = w; canvas.height = h;
-        ctx.drawImage(img, 0, 0, w, h);
-
-        const data = ctx.getImageData(0, 0, w, h).data;
-        let edges = new Uint8Array(w * h);
-
-        for (let y = 1; y < h - 1; y++) {
-            for (let x = 1; x < w - 1; x++) {
-                let idx = (y * w + x) * 4;
-                let val = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-                let valRight = (data[idx + 4] + data[idx + 5] + data[idx + 6]) / 3;
-                let diff = Math.abs(val - valRight);
-                edges[y * w + x] = diff > 30 ? 1 : 0;
-            }
-        }
-
-        rawParsedPaths = [];
-        let visited = new Uint8Array(w * h);
-
-        for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-                if (edges[y * w + x] && !visited[y * w + x]) {
-                    let pathObj = { points: [] };
-                    let currX = x, currY = y;
-
-                    while (currX >= 0 && currX < w && currY >= 0 && currY < h && edges[currY * w + currX] && !visited[currY * w + currX]) {
-                        visited[currY * w + currX] = 1;
-                        pathObj.points.push({ x: currX - w / 2, y: -(currY - h / 2) });
-
-                        let nextPt = false;
-                        for (let dy = -1; dy <= 1 && !nextPt; dy++) {
-                            for (let dx = -1; dx <= 1 && !nextPt; dx++) {
-                                let nx = currX + dx, ny = currY + dy;
-                                if (nx >= 0 && nx < w && ny >= 0 && ny < h && edges[ny * w + nx] && !visited[ny * w + nx]) {
-                                    currX = nx; currY = ny;
-                                    nextPt = true;
-                                }
-                            }
-                        }
-                        if (!nextPt) break;
-                    }
-                    if (pathObj.points.length > 3) rawParsedPaths.push(pathObj);
-                }
-            }
-        }
-
-        applyTransformations();
-        renderCanvasPreview();
-        document.getElementById("plotStatusText").innerText = `Image converted into ${rawParsedPaths.length} paths. Drag/scale to place in reach.`;
-    };
-    img.src = URL.createObjectURL(file);
-}
-
 // ==================== EXECUTION ENGINE ==================== //
 
 async function startPlotting() {
@@ -650,7 +755,7 @@ async function startPlotting() {
         const startTarget = calculateIK(path.points[0].x, path.points[0].y);
         if (!startTarget) continue;
 
-        // Pen UP & move to stroke start smoothly in Cartesian space
+        // Move to stroke start smoothly with pen UP
         await lerpMoveCartesian(path.points[0].x, path.points[0].y, 0, lerpDelayMs);
         await new Promise(r => setTimeout(r, 150));
 
