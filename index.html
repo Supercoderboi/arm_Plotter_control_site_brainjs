@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCARA 0.1° Micro-Stepping Controller</title>
+    <title>SCARA Precision Controller</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; background: #121212; color: #fff; }
         .card { background: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
@@ -26,7 +26,7 @@
 </head>
 <body>
 
-    <h2>SCARA 0.1° Micro-Stepping Controller</h2>
+    <h2>SCARA Precision IK Controller</h2>
 
     <!-- BLE Connection -->
     <div class="card">
@@ -55,36 +55,36 @@
         <div class="row">
             <div>
                 <div class="setting-label">Target X (mm)</div>
-                <input type="number" id="targetX" value="0" step="0.5">
+                <input type="number" id="targetX" value="0" step="1">
             </div>
             <div>
                 <div class="setting-label">Target Y (mm)</div>
-                <input type="number" id="targetY" value="150" step="0.5">
+                <input type="number" id="targetY" value="150" step="1">
             </div>
         </div>
         <div class="row">
-            <button onclick="togglePen(1)">Pen DOWN (100°)</button>
-            <button onclick="togglePen(0)">Pen UP (130°)</button>
+            <button onclick="togglePen(1)">Pen DOWN</button>
+            <button onclick="togglePen(0)">Pen UP</button>
         </div>
         <button onclick="moveToTarget()" class="btn-green">Move to Coordinates</button>
 
         <div id="predictionDisplay" class="prediction-box">
             <strong>Current Target:</strong> X: <span id="outX">0</span> mm, Y: <span id="outY">150</span> mm<br>
-            <strong>Calculated Angles:</strong> Base: <span id="outBase">90.0</span>°, Joint: <span id="outJoint">90.0</span>°
+            <strong>Calculated Angles:</strong> Base: <span id="outBase">90</span>°, Joint: <span id="outJoint">90</span>°
         </div>
     </div>
 
     <!-- Manual Joint Control Sliders -->
     <div class="card">
         <h3>Manual Joint Angles</h3>
-        <label>Base Angle (0-180): <span id="baseVal">90.0</span>°</label>
-        <input type="range" id="baseSlider" min="0" max="180" value="90" step="0.1" style="width: 100%;" oninput="handleSliderInput()">
+        <label>Base Angle (0-180): <span id="baseVal">90</span>°</label>
+        <input type="range" id="baseSlider" min="0" max="180" value="90" style="width: 100%;" oninput="handleSliderInput()">
         
-        <label>Joint Angle (0-180): <span id="jointVal">90.0</span>°</label>
-        <input type="range" id="jointSlider" min="0" max="180" value="90" step="0.1" style="width: 100%;" oninput="handleSliderInput()">
+        <label>Joint Angle (0-180): <span id="jointVal">90</span>°</label>
+        <input type="range" id="jointSlider" min="0" max="180" value="90" style="width: 100%;" oninput="handleSliderInput()">
     </div>
 
-    <!-- Interactive Canvas Engine -->
+    <!-- Interactive Canvas & Positioning Engine -->
     <div class="card">
         <h3>Interactive Image Drag & Scale Engine</h3>
         <div class="row">
@@ -108,11 +108,11 @@
             <strong>Workspace Status:</strong> <span id="reachStatus" style="color: #34c759;">Inside Safe Reach</span>
         </div>
 
-        <div class="setting-label">Sub-Step Delay (ms)</div>
-        <input type="number" id="lerpDelayInput" value="25" min="5" max="100">
+        <div class="setting-label">Interpolation Delay per Sub-Step (ms)</div>
+        <input type="number" id="lerpDelayInput" value="15" min="5" max="100">
 
         <div class="row" style="margin-top: 10px;">
-            <button id="startPlotBtn" onclick="startPlotting()" class="btn-green">Start Smooth Micro-Plot</button>
+            <button id="startPlotBtn" onclick="startPlotting()" class="btn-green">Start Smooth Plot</button>
             <button id="stopPlotBtn" onclick="stopPlotting()" class="btn-red" disabled>Abort Plot</button>
         </div>
 
@@ -128,11 +128,10 @@ const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
 let rxCharacteristic = null;
 let bleDevice = null;
-let isBusySending = false;
 
 // Hardware State
-let currentBaseAngle = 90.0;
-let currentJointAngle = 90.0;
+let currentBaseAngle = 90;
+let currentJointAngle = 90;
 let currentPenState = 0;
 
 // Path & Transformation State
@@ -156,18 +155,12 @@ window.onload = function() {
     renderCanvasPreview();
 };
 
-// ==================== UPDATED BLUETOOTH IMPLEMENTATION ==================== //
-
 async function connectBLE() {
     try {
-        // Must be called directly inside user event context to prevent DOM Security Errors
         bleDevice = await navigator.bluetooth.requestDevice({
             filters: [{ name: 'SCARA_Plotter' }],
             optionalServices: [SERVICE_UUID]
         });
-        
-        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-        
         const server = await bleDevice.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
         rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_RX_UUID);
@@ -175,61 +168,27 @@ async function connectBLE() {
         document.getElementById("bleStatus").innerText = "Connected";
         document.getElementById("bleStatus").className = "status connected";
     } catch (error) {
-        console.error(error);
         alert("BLE Connection Error: " + error);
     }
 }
 
-function onDisconnected() {
-    document.getElementById("bleStatus").innerText = "Disconnected";
-    document.getElementById("bleStatus").className = "status";
-    rxCharacteristic = null;
-    isBusySending = false;
-}
-
 async function sendPacket(base, joint, pen) {
-    if (!rxCharacteristic) return false;
-    
-    // Prevent GATT queue congestion when micro-stepping rapidly
-    if (isBusySending) return false; 
-    isBusySending = true;
-
-    try {
-        const encoder = new TextEncoder();
-        const packet = `${base.toFixed(1)},${joint.toFixed(1)},${pen}\n`;
-        const data = encoder.encode(packet);
-        
-        // Fast, non-blocking packet transfer for smooth movement
-        if (rxCharacteristic.writeValueWithoutResponse) {
-            await rxCharacteristic.writeValueWithoutResponse(data);
-        } else {
-            await rxCharacteristic.writeValue(data);
-        }
-        
-        currentBaseAngle = base;
-        currentJointAngle = joint;
-        return true;
-    } catch (err) {
-        console.warn("BLE Packet drop:", err);
-        return false;
-    } finally {
-        isBusySending = false;
-    }
+    if (!rxCharacteristic) return;
+    const encoder = new TextEncoder();
+    const packet = `${Math.round(base)},${Math.round(joint)},${pen}\n`;
+    await rxCharacteristic.writeValue(encoder.encode(packet));
+    currentBaseAngle = base;
+    currentJointAngle = joint;
 }
 
-// ==================== UNCHANGED LOGIC & ENGINE ==================== //
-
-// Sub-degree LERP Movement Engine
-async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 25) {
+async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 15) {
     const startBase = currentBaseAngle;
     const startJoint = currentJointAngle;
 
     const baseDelta = Math.abs(targetBase - startBase);
     const jointDelta = Math.abs(targetJoint - startJoint);
     const maxDelta = Math.max(baseDelta, jointDelta);
-
-    const stepSize = 0.3; // Degree increments per step
-    const steps = Math.max(1, Math.ceil(maxDelta / stepSize));
+    const steps = Math.max(1, Math.ceil(maxDelta));
 
     for (let i = 1; i <= steps; i++) {
         if (shouldAbort) break;
@@ -242,7 +201,8 @@ async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 25) {
     }
 }
 
-// Original Kinematics logic preserved exactly as provided
+// ==================== INVERSE KINEMATICS ENGINE ==================== //
+
 function calculateIK(x, y) {
     const L1 = parseFloat(document.getElementById("link1Length").value) || 114;
     const L2 = parseFloat(document.getElementById("link2Length").value) || 218.51;
@@ -261,14 +221,14 @@ function calculateIK(x, y) {
     const alpha = Math.atan2(y, x);
     const beta = Math.atan2(L2 * Math.sin(theta2), L1 + L2 * Math.cos(theta2));
 
-    const rawBaseDeg = (alpha - beta) * (180 / Math.PI);
+    const rawBaseDeg = (alpha + beta) * (180 / Math.PI);
     const rawJointDeg = theta2 * (180 / Math.PI);
 
     let baseDeg = 90 + (90 - rawBaseDeg);
-    let jointDeg = rawJointDeg;
+    let jointDeg = 180 - rawJointDeg;
 
-    baseDeg = Math.max(0, Math.min(180, baseDeg));
-    jointDeg = Math.max(0, Math.min(180, jointDeg));
+    baseDeg = Math.max(0, Math.min(180, Math.round(baseDeg)));
+    jointDeg = Math.max(0, Math.min(180, Math.round(jointDeg)));
 
     return { base: baseDeg, joint: jointDeg };
 }
@@ -290,22 +250,22 @@ async function moveToTarget() {
 
     document.getElementById("outX").innerText = tx;
     document.getElementById("outY").innerText = ty;
-    document.getElementById("outBase").innerText = angles.base.toFixed(1);
-    document.getElementById("outJoint").innerText = angles.joint.toFixed(1);
+    document.getElementById("outBase").innerText = angles.base;
+    document.getElementById("outJoint").innerText = angles.joint;
     document.getElementById("baseSlider").value = angles.base;
     document.getElementById("jointSlider").value = angles.joint;
-    document.getElementById("baseVal").innerText = angles.base.toFixed(1);
-    document.getElementById("jointVal").innerText = angles.joint.toFixed(1);
+    document.getElementById("baseVal").innerText = angles.base;
+    document.getElementById("jointVal").innerText = angles.joint;
 
-    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 25;
+    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 15;
     await lerpMove(angles.base, angles.joint, currentPenState, delay);
 }
 
 async function handleSliderInput() {
     const base = parseFloat(document.getElementById("baseSlider").value);
     const joint = parseFloat(document.getElementById("jointSlider").value);
-    document.getElementById("baseVal").innerText = base.toFixed(1);
-    document.getElementById("jointVal").innerText = joint.toFixed(1);
+    document.getElementById("baseVal").innerText = base;
+    document.getElementById("jointVal").innerText = joint;
 
     await sendPacket(base, joint, currentPenState);
 }
@@ -315,7 +275,8 @@ function togglePen(state) {
     sendPacket(currentBaseAngle, currentJointAngle, currentPenState);
 }
 
-// Interactive Canvas Engine
+// ==================== INTERACTIVE CANVAS ENGINE ==================== //
+
 function initCanvasEvents() {
     const canvas = document.getElementById("previewCanvas");
 
@@ -396,6 +357,7 @@ function renderCanvasPreview(activePt = null) {
     const originX = canvas.width / 2;
     const originY = canvas.height - 20;
 
+    // Reach Ring Constraints
     ctx.strokeStyle = "#333";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -448,7 +410,8 @@ function renderCanvasPreview(activePt = null) {
     }
 }
 
-// Vector & Raster Path Generator
+// ==================== VECTOR & RASTER PATH GENERATOR ==================== //
+
 function handleSVGUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -470,7 +433,7 @@ function handleSVGUpload(event) {
                     const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
                     tempPath.setAttribute("d", d);
                     const length = tempPath.getTotalLength();
-                    const step = Math.max(1, length / 60);
+                    const step = Math.max(1, length / 50);
 
                     for (let i = 0; i <= length; i += step) {
                         const pt = tempPath.getPointAtLength(i);
@@ -483,6 +446,7 @@ function handleSVGUpload(event) {
             if (pathObj.points.length > 0) rawParsedPaths.push(pathObj);
         });
 
+        // Center SVG around origin and invert SVG's top-left Y-axis to Cartesian
         const width = maxX - minX || 1;
         const height = maxY - minY || 1;
         rawParsedPaths.forEach(path => {
@@ -566,7 +530,8 @@ function handleImageUpload(event) {
     img.src = URL.createObjectURL(file);
 }
 
-// Execution Engine
+// ==================== EXECUTION ENGINE ==================== //
+
 async function startPlotting() {
     if (!rxCharacteristic) {
         alert("Connect Bluetooth first!");
@@ -583,7 +548,7 @@ async function startPlotting() {
     document.getElementById("startPlotBtn").disabled = true;
     document.getElementById("stopPlotBtn").disabled = false;
 
-    const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 25;
+    const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 15;
 
     let totalPoints = 0;
     transformedPaths.forEach(p => totalPoints += p.points.length);
@@ -597,13 +562,13 @@ async function startPlotting() {
         const startTarget = calculateIK(path.points[0].x, path.points[0].y);
         if (!startTarget) continue;
 
-        // Move to stroke start with Pen UP
+        // Pen UP & move to stroke start
         await lerpMove(startTarget.base, startTarget.joint, 0, lerpDelayMs);
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 150));
 
         // Lower Pen
         await sendPacket(startTarget.base, startTarget.joint, 1);
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 150));
 
         // Trace Stroke
         for (let ptIdx = 0; ptIdx < path.points.length; ptIdx++) {
@@ -627,7 +592,7 @@ async function startPlotting() {
         const endTarget = calculateIK(lastPt.x, lastPt.y);
         if (endTarget) {
             await sendPacket(endTarget.base, endTarget.joint, 0);
-            await new Promise(r => setTimeout(r, 150));
+            await new Promise(r => setTimeout(r, 100));
         }
     }
 
