@@ -133,6 +133,8 @@ let bleDevice = null;
 let currentBaseAngle = 90;
 let currentJointAngle = 90;
 let currentPenState = 0;
+let currentX = 0;
+let currentY = 150;
 
 // Path & Transformation State
 let rawParsedPaths = []; 
@@ -181,6 +183,47 @@ async function sendPacket(base, joint, pen) {
     currentJointAngle = joint;
 }
 
+// Low-jitter synchronized dual-motor vector interpolation
+async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 15) {
+    const startX = currentX;
+    const startY = currentY;
+
+    const dx = targetX - startX;
+    const dy = targetY - startY;
+    const linearDistance = Math.hypot(dx, dy);
+
+    // Calculate total sub-steps based on path length for consistent spatial velocity
+    const resolution = 1.5; // mm per step threshold
+    const minSteps = 12;
+    const steps = Math.max(minSteps, Math.ceil(linearDistance / resolution));
+
+    for (let i = 1; i <= steps; i++) {
+        if (shouldAbort) break;
+
+        const startTime = performance.now();
+        const rawProgress = i / steps;
+
+        // Smoothstep acceleration curve: 3t^2 - 2t^3
+        const smoothProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+
+        const interpX = startX + dx * smoothProgress;
+        const interpY = startY + dy * smoothProgress;
+
+        const angles = calculateIK(interpX, interpY);
+        if (angles) {
+            await sendPacket(angles.base, angles.joint, penState);
+            currentX = interpX;
+            currentY = interpY;
+        }
+
+        const elapsed = performance.now() - startTime;
+        const remainingDelay = Math.max(0, stepDelayMs - elapsed);
+        if (remainingDelay > 0) {
+            await new Promise(r => setTimeout(r, remainingDelay));
+        }
+    }
+}
+
 async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 15) {
     const startBase = currentBaseAngle;
     const startJoint = currentJointAngle;
@@ -188,16 +231,25 @@ async function lerpMove(targetBase, targetJoint, penState, stepDelayMs = 15) {
     const baseDelta = Math.abs(targetBase - startBase);
     const jointDelta = Math.abs(targetJoint - startJoint);
     const maxDelta = Math.max(baseDelta, jointDelta);
-    const steps = Math.max(1, Math.ceil(maxDelta));
+    const steps = Math.max(12, Math.ceil(maxDelta * 1.5));
 
     for (let i = 1; i <= steps; i++) {
         if (shouldAbort) break;
-        const t = i / steps;
-        const interpBase = startBase + (targetBase - startBase) * t;
-        const interpJoint = startJoint + (targetJoint - startJoint) * t;
+
+        const startTime = performance.now();
+        const rawProgress = i / steps;
+        const smoothProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
+
+        const interpBase = startBase + (targetBase - startBase) * smoothProgress;
+        const interpJoint = startJoint + (targetJoint - startJoint) * smoothProgress;
 
         await sendPacket(interpBase, interpJoint, penState);
-        await new Promise(r => setTimeout(r, stepDelayMs));
+
+        const elapsed = performance.now() - startTime;
+        const remainingDelay = Math.max(0, stepDelayMs - elapsed);
+        if (remainingDelay > 0) {
+            await new Promise(r => setTimeout(r, remainingDelay));
+        }
     }
 }
 
@@ -258,7 +310,7 @@ async function moveToTarget() {
     document.getElementById("jointVal").innerText = angles.joint;
 
     const delay = parseInt(document.getElementById("lerpDelayInput").value) || 15;
-    await lerpMove(angles.base, angles.joint, currentPenState, delay);
+    await lerpMoveCartesian(tx, ty, currentPenState, delay);
 }
 
 async function handleSliderInput() {
@@ -562,8 +614,8 @@ async function startPlotting() {
         const startTarget = calculateIK(path.points[0].x, path.points[0].y);
         if (!startTarget) continue;
 
-        // Pen UP & move to stroke start
-        await lerpMove(startTarget.base, startTarget.joint, 0, lerpDelayMs);
+        // Pen UP & move to stroke start smoothly in Cartesian space
+        await lerpMoveCartesian(path.points[0].x, path.points[0].y, 0, lerpDelayMs);
         await new Promise(r => setTimeout(r, 150));
 
         // Lower Pen
@@ -571,14 +623,14 @@ async function startPlotting() {
         await new Promise(r => setTimeout(r, 150));
 
         // Trace Stroke
-        for (let ptIdx = 0; ptIdx < path.points.length; ptIdx++) {
+        for (let ptIdx = 1; ptIdx < path.points.length; ptIdx++) {
             if (shouldAbort) break;
 
             const pt = path.points[ptIdx];
             const angles = calculateIK(pt.x, pt.y);
             if (!angles) continue;
 
-            await lerpMove(angles.base, angles.joint, 1, lerpDelayMs);
+            await lerpMoveCartesian(pt.x, pt.y, 1, lerpDelayMs);
 
             currentPointIndex++;
             const pct = Math.round((currentPointIndex / totalPoints) * 100);
