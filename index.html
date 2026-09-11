@@ -132,7 +132,7 @@
         </div>
 
         <div class="setting-label">Interpolation Delay per Sub-Step (ms)</div>
-        <input type="number" id="lerpDelayInput" value="15" min="5" max="100">
+        <input type="number" id="lerpDelayInput" value="12" min="5" max="100">
 
         <div class="row" style="margin-top: 10px;">
             <button id="startPlotBtn" onclick="startPlotting()" class="btn-green">Start Smooth Plot</button>
@@ -145,7 +145,6 @@
         <div id="plotStatusText" style="margin-top: 5px; font-size: 14px;">No File Loaded</div>
     </div>
 
-    <!-- Hidden Offscreen Container for SVG DOM Rendering -->
     <div id="svgContainer" style="display:none; position:absolute; left:-9999px; top:-9999px;"></div>
 
 <script>
@@ -162,13 +161,13 @@ let currentPenState = 0;
 let currentX = 0;
 let currentY = 150;
 
-// Path & Precision Transformation State
+// Path State
 let rawParsedPaths = []; 
 let transformedPaths = [];
 let coarseScale = 1.0;
 let fineScaleTrim = 0.0;
 let imgScale = 1.0;
-let imgOffsetX = 0;   
+let imgOffsetX = 0;    
 let imgOffsetY = 150; 
 
 // Interactive Drag State
@@ -211,28 +210,38 @@ async function sendPacket(base, joint, pen) {
     currentJointAngle = joint;
 }
 
-// Synchronized dual-motor vector interpolation
-async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 15) {
+// Fixed High-Precision Linear Vector Interpolation (Constant Velocity LERP)
+async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 12) {
     const startX = currentX;
     const startY = currentY;
 
     const dx = targetX - startX;
     const dy = targetY - startY;
-    const linearDistance = Math.hypot(dx, dy);
+    const distance = Math.hypot(dx, dy);
 
-    const resolution = 1.5; 
-    const minSteps = 12;
-    const steps = Math.max(minSteps, Math.ceil(linearDistance / resolution));
+    // If step distance is tiny (< 0.8mm), move directly to avoid unnecessary overhead
+    if (distance < 0.8) {
+        const angles = calculateIK(targetX, targetY);
+        if (angles) {
+            await sendPacket(angles.base, angles.joint, penState);
+            currentX = targetX;
+            currentY = targetY;
+            await new Promise(r => setTimeout(r, stepDelayMs));
+        }
+        return;
+    }
+
+    // Step resolution: 0.5mm micro-steps
+    const STEP_SIZE_MM = 0.5;
+    const steps = Math.max(1, Math.ceil(distance / STEP_SIZE_MM));
 
     for (let i = 1; i <= steps; i++) {
         if (shouldAbort) break;
 
-        const startTime = performance.now();
-        const rawProgress = i / steps;
-        const smoothProgress = rawProgress * rawProgress * (3 - 2 * rawProgress);
-
-        const interpX = startX + dx * smoothProgress;
-        const interpY = startY + dy * smoothProgress;
+        // Pure Linear Interpolation (No accelerating S-curves on sub-steps)
+        const progress = i / steps;
+        const interpX = startX + (dx * progress);
+        const interpY = startY + (dy * progress);
 
         const angles = calculateIK(interpX, interpY);
         if (angles) {
@@ -241,11 +250,7 @@ async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 15) {
             currentY = interpY;
         }
 
-        const elapsed = performance.now() - startTime;
-        const remainingDelay = Math.max(0, stepDelayMs - elapsed);
-        if (remainingDelay > 0) {
-            await new Promise(r => setTimeout(r, remainingDelay));
-        }
+        await new Promise(r => setTimeout(r, stepDelayMs));
     }
 }
 
@@ -292,7 +297,7 @@ function nudgeScale(amount) {
     updateScaleState(newScale);
 }
 
-// ==================== HIGH-PRECISION VECTOR & SVG PIPELINE ==================== //
+// ==================== VECTOR & SVG PIPELINE ==================== //
 
 function parseSVGToPaths(svgString) {
     const container = document.getElementById("svgContainer");
@@ -301,7 +306,6 @@ function parseSVGToPaths(svgString) {
     const svgElement = container.querySelector("svg");
     if (!svgElement) return [];
 
-    // Force shape primitives to <path>
     const shapes = svgElement.querySelectorAll("rect, circle, ellipse, line, polyline, polygon");
     shapes.forEach(shape => {
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -350,8 +354,7 @@ function parseSVGToPaths(svgString) {
             const length = path.getTotalLength();
             if (length === 0) return;
 
-            // High-resolution adaptive spatial step calculation
-            const sampleStep = 1.0; // 1mm resolution step along vector curve
+            const sampleStep = 1.0; 
             const numSamples = Math.max(10, Math.ceil(length / sampleStep));
 
             let currentPathObj = { points: [] };
@@ -360,7 +363,6 @@ function parseSVGToPaths(svgString) {
                 const distance = (i / numSamples) * length;
                 let pt = path.getPointAtLength(distance);
 
-                // Bake CTM Matrix transformations
                 const ctm = path.getCTM();
                 if (ctm) {
                     const svgPoint = svgElement.createSVGPoint();
@@ -383,9 +385,8 @@ function parseSVGToPaths(svgString) {
         }
     });
 
-    container.innerHTML = ""; // Clear temporary DOM node
+    container.innerHTML = "";
 
-    // Center paths around vector origin and invert Y to Cartesian plane
     const width = maxX - minX || 1;
     const height = maxY - minY || 1;
 
@@ -399,7 +400,6 @@ function parseSVGToPaths(svgString) {
     return optimizePathOrder(extractedPaths);
 }
 
-// Nearest Neighbor Path Sorting to minimize pen-up jump travel
 function optimizePathOrder(paths) {
     if (paths.length <= 1) return paths;
 
@@ -453,7 +453,6 @@ function handleSVGUpload(event) {
     reader.readAsText(file);
 }
 
-// Upgraded Image Processor with Edge-Smoothing & Path Cleanup
 function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -463,22 +462,18 @@ function handleImageUpload(event) {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         
-        // Resolution limit to prevent micro-jitter
         const maxDim = 100; 
         let w = img.width, h = img.height;
         if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
         else { w = Math.round((w * maxDim) / h); h = maxDim; }
 
         canvas.width = w; canvas.height = h;
-        
-        // Apply mild blur filter to smooth pixel-edge noise
         ctx.filter = 'blur(1px)';
         ctx.drawImage(img, 0, 0, w, h);
 
         const data = ctx.getImageData(0, 0, w, h).data;
         let edges = new Uint8Array(w * h);
 
-        // Luminance thresholding for clean edge lines
         for (let y = 1; y < h - 1; y++) {
             for (let x = 1; x < w - 1; x++) {
                 let idx = (y * w + x) * 4;
@@ -517,9 +512,7 @@ function handleImageUpload(event) {
                         if (!nextPt) break;
                     }
 
-                    // IGNORE MICRO-PATH NOISE (Filter out tiny scribbles < 8 points)
                     if (pathObj.points.length > 8) {
-                        // Sub-sample path to keep lines smooth (take every 2nd point)
                         pathObj.points = pathObj.points.filter((_, idx) => idx % 2 === 0);
                         rawParsedPaths.push(pathObj);
                     }
@@ -534,6 +527,7 @@ function handleImageUpload(event) {
     };
     img.src = URL.createObjectURL(file);
 }
+
 // ==================== INVERSE KINEMATICS ENGINE ==================== //
 
 function calculateIK(x, y) {
@@ -590,7 +584,7 @@ async function moveToTarget() {
     document.getElementById("baseVal").innerText = angles.base;
     document.getElementById("jointVal").innerText = angles.joint;
 
-    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 15;
+    const delay = parseInt(document.getElementById("lerpDelayInput").value) || 12;
     await lerpMoveCartesian(tx, ty, currentPenState, delay);
 }
 
@@ -754,7 +748,7 @@ async function startPlotting() {
     document.getElementById("startPlotBtn").disabled = true;
     document.getElementById("stopPlotBtn").disabled = false;
 
-    const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 15;
+    const lerpDelayMs = parseInt(document.getElementById("lerpDelayInput").value) || 12;
 
     let totalPoints = 0;
     transformedPaths.forEach(p => totalPoints += p.points.length);
@@ -770,11 +764,11 @@ async function startPlotting() {
 
         // Move to stroke start smoothly with pen UP
         await lerpMoveCartesian(path.points[0].x, path.points[0].y, 0, lerpDelayMs);
-        await new Promise(r => setTimeout(r, 150));
+        await new Promise(r => setTimeout(r, 100));
 
         // Lower Pen
         await sendPacket(startTarget.base, startTarget.joint, 1);
-        await new Promise(r => setTimeout(r, 150));
+        await new Promise(r => setTimeout(r, 100));
 
         // Trace Stroke
         for (let ptIdx = 1; ptIdx < path.points.length; ptIdx++) {
@@ -790,7 +784,11 @@ async function startPlotting() {
             const pct = Math.round((currentPointIndex / totalPoints) * 100);
             document.getElementById("plotProgress").style.width = pct + "%";
             document.getElementById("plotStatusText").innerText = `Plotting... ${pct}%`;
-            renderCanvasPreview(pt);
+            
+            // Re-render UI frame every 5 points to save main thread bandwidth for BLE stream
+            if (ptIdx % 5 === 0) {
+                renderCanvasPreview(pt);
+            }
         }
 
         // Lift Pen after stroke
