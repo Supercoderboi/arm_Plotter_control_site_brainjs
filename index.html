@@ -153,6 +153,7 @@ const CHARACTERISTIC_RX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
 let rxCharacteristic = null;
 let bleDevice = null;
+let isSendingBLE = false; // Mutex guard to prevent BLE queue buffer congestion
 
 // Hardware State
 let currentBaseAngle = 90;
@@ -201,16 +202,32 @@ async function connectBLE() {
     }
 }
 
+// Optimized Non-Blocking Write Mechanism
 async function sendPacket(base, joint, pen) {
-    if (!rxCharacteristic) return;
-    const encoder = new TextEncoder();
-    const packet = `${Math.round(base)},${Math.round(joint)},${pen}\n`;
-    await rxCharacteristic.writeValue(encoder.encode(packet));
-    currentBaseAngle = base;
-    currentJointAngle = joint;
+    if (!rxCharacteristic || isSendingBLE) return;
+
+    isSendingBLE = true;
+    try {
+        const encoder = new TextEncoder();
+        const packet = `${Math.round(base)},${Math.round(joint)},${pen}\n`;
+        
+        // Attempt unacknowledged fast write if supported, fallback to standard write
+        if (rxCharacteristic.properties.writeWithoutResponse) {
+            await rxCharacteristic.writeValueWithoutResponse(encoder.encode(packet));
+        } else {
+            await rxCharacteristic.writeValue(encoder.encode(packet));
+        }
+        
+        currentBaseAngle = base;
+        currentJointAngle = joint;
+    } catch (err) {
+        // Suppress transient packet drop warnings during rapid streams
+    } finally {
+        isSendingBLE = false;
+    }
 }
 
-// Fixed High-Precision Linear Vector Interpolation (Constant Velocity LERP)
+// Optimized Linear Interp + Joint Angular Speed Guard
 async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 12) {
     const startX = currentX;
     const startY = currentY;
@@ -219,7 +236,6 @@ async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 12) {
     const dy = targetY - startY;
     const distance = Math.hypot(dx, dy);
 
-    // If step distance is tiny (< 0.8mm), move directly to avoid unnecessary overhead
     if (distance < 0.8) {
         const angles = calculateIK(targetX, targetY);
         if (angles) {
@@ -231,27 +247,76 @@ async function lerpMoveCartesian(targetX, targetY, penState, stepDelayMs = 12) {
         return;
     }
 
-    // Step resolution: 0.5mm micro-steps
     const STEP_SIZE_MM = 0.5;
     const steps = Math.max(1, Math.ceil(distance / STEP_SIZE_MM));
+    const MAX_ANGULAR_STEP_DEG = 3.0; // Throttle limit if motor angular velocity spikes
 
     for (let i = 1; i <= steps; i++) {
         if (shouldAbort) break;
 
-        // Pure Linear Interpolation (No accelerating S-curves on sub-steps)
         const progress = i / steps;
         const interpX = startX + (dx * progress);
         const interpY = startY + (dy * progress);
 
         const angles = calculateIK(interpX, interpY);
         if (angles) {
-            await sendPacket(angles.base, angles.joint, penState);
-            currentX = interpX;
-            currentY = interpY;
-        }
+            const dBase = Math.abs(angles.base - currentBaseAngle);
+            const dJoint = Math.abs(angles.joint - currentJointAngle);
 
-        await new Promise(r => setTimeout(r, stepDelayMs));
+            // Throttle Cartesian sub-stepping near kinematic singularities
+            if (dBase > MAX_ANGULAR_STEP_DEG || dJoint > MAX_ANGULAR_STEP_DEG) {
+                const maxDelta = Math.max(dBase, dJoint);
+                const ratio = MAX_ANGULAR_STEP_DEG / maxDelta;
+
+                const clampedBase = currentBaseAngle + (angles.base - currentBaseAngle) * ratio;
+                const clampedJoint = currentJointAngle + (angles.joint - currentJointAngle) * ratio;
+
+                await sendPacket(clampedBase, clampedJoint, penState);
+                currentX = interpX;
+                currentY = interpY;
+                await new Promise(r => setTimeout(r, Math.round(stepDelayMs * 1.4)));
+            } else {
+                await sendPacket(angles.base, angles.joint, penState);
+                currentX = interpX;
+                currentY = interpY;
+                await new Promise(r => setTimeout(r, stepDelayMs));
+            }
+        }
     }
+}
+
+// Ramer-Douglas-Peucker Vector Simplification Filter
+function simplifyPath(points, tolerance = 0.3) {
+    if (points.length <= 2) return points;
+
+    let maxDist = 0;
+    let index = 0;
+    const end = points.length - 1;
+
+    for (let i = 1; i < end; i++) {
+        const dist = perpendicularDistance(points[i], points[0], points[end]);
+        if (dist > maxDist) {
+            maxDist = dist;
+            index = i;
+        }
+    }
+
+    if (maxDist > tolerance) {
+        const left = simplifyPath(points.slice(0, index + 1), tolerance);
+        const right = simplifyPath(points.slice(index), tolerance);
+        return left.slice(0, left.length - 1).concat(right);
+    } else {
+        return [points[0], points[end]];
+    }
+}
+
+function perpendicularDistance(p, p1, p2) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    if (dx === 0 && dy === 0) return Math.hypot(p.x - p1.x, p.y - p1.y);
+    const num = Math.abs(dy * p.x - dx * p.y + p2.x * p1.y - p2.y * p1.x);
+    const den = Math.hypot(dx, dy);
+    return num / den;
 }
 
 // ==================== HIGH PRECISION SCALE CONTROLLERS ==================== //
@@ -377,7 +442,9 @@ function parseSVGToPaths(svgString) {
                 minY = Math.min(minY, pt.y); maxY = Math.max(maxY, pt.y);
             }
 
+            // Apply Path Simplification to lower buffer stress
             if (currentPathObj.points.length > 0) {
+                currentPathObj.points = simplifyPath(currentPathObj.points, 0.3);
                 extractedPaths.push(currentPathObj);
             }
         } catch (err) {
@@ -513,7 +580,7 @@ function handleImageUpload(event) {
                     }
 
                     if (pathObj.points.length > 8) {
-                        pathObj.points = pathObj.points.filter((_, idx) => idx % 2 === 0);
+                        pathObj.points = simplifyPath(pathObj.points, 0.4);
                         rawParsedPaths.push(pathObj);
                     }
                 }
@@ -785,7 +852,6 @@ async function startPlotting() {
             document.getElementById("plotProgress").style.width = pct + "%";
             document.getElementById("plotStatusText").innerText = `Plotting... ${pct}%`;
             
-            // Re-render UI frame every 5 points to save main thread bandwidth for BLE stream
             if (ptIdx % 5 === 0) {
                 renderCanvasPreview(pt);
             }
