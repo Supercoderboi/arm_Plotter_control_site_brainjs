@@ -453,6 +453,7 @@ function handleSVGUpload(event) {
     reader.readAsText(file);
 }
 
+// Upgraded Image Processor with Edge-Smoothing & Path Cleanup
 function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -461,25 +462,32 @@ function handleImageUpload(event) {
     img.onload = function() {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        const maxDim = 120;
-
+        
+        // Resolution limit to prevent micro-jitter
+        const maxDim = 100; 
         let w = img.width, h = img.height;
         if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
         else { w = Math.round((w * maxDim) / h); h = maxDim; }
 
         canvas.width = w; canvas.height = h;
+        
+        // Apply mild blur filter to smooth pixel-edge noise
+        ctx.filter = 'blur(1px)';
         ctx.drawImage(img, 0, 0, w, h);
 
         const data = ctx.getImageData(0, 0, w, h).data;
         let edges = new Uint8Array(w * h);
 
+        // Luminance thresholding for clean edge lines
         for (let y = 1; y < h - 1; y++) {
             for (let x = 1; x < w - 1; x++) {
                 let idx = (y * w + x) * 4;
                 let val = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
                 let valRight = (data[idx + 4] + data[idx + 5] + data[idx + 6]) / 3;
-                let diff = Math.abs(val - valRight);
-                edges[y * w + x] = diff > 30 ? 1 : 0;
+                let valDown = (data[(y + 1) * w + x] + data[(y + 1) * w + x + 1] + data[(y + 1) * w + x + 2]) / 3;
+                
+                let diff = Math.abs(val - valRight) + Math.abs(val - valDown);
+                edges[y * w + x] = diff > 40 ? 1 : 0;
             }
         }
 
@@ -508,7 +516,13 @@ function handleImageUpload(event) {
                         }
                         if (!nextPt) break;
                     }
-                    if (pathObj.points.length > 3) rawParsedPaths.push(pathObj);
+
+                    // IGNORE MICRO-PATH NOISE (Filter out tiny scribbles < 8 points)
+                    if (pathObj.points.length > 8) {
+                        // Sub-sample path to keep lines smooth (take every 2nd point)
+                        pathObj.points = pathObj.points.filter((_, idx) => idx % 2 === 0);
+                        rawParsedPaths.push(pathObj);
+                    }
                 }
             }
         }
@@ -516,11 +530,10 @@ function handleImageUpload(event) {
         rawParsedPaths = optimizePathOrder(rawParsedPaths);
         applyTransformations();
         renderCanvasPreview();
-        document.getElementById("plotStatusText").innerText = `Image converted into ${rawParsedPaths.length} optimized vector paths.`;
+        document.getElementById("plotStatusText").innerText = `Cleaned Vector: ${rawParsedPaths.length} smooth paths generated.`;
     };
     img.src = URL.createObjectURL(file);
 }
-
 // ==================== INVERSE KINEMATICS ENGINE ==================== //
 
 function calculateIK(x, y) {
